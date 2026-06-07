@@ -1,0 +1,19 @@
+{
+  "name": "meridian",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered yield optimizer vault on Mantle — ERC-4626 + ERC-8004",
+  "workspaces": [
+    "packages/keeper",
+    "packages/frontend"
+  ],
+  "scripts": {
+    "build:contracts": "cd packages/contracts && forge build",
+    "test:contracts": "cd packages/contracts && forge test -v",
+    "dev:keeper": "cd packages/keeper && pnpm dev",
+    "dev:frontend": "cd packages/frontend && pnpm dev"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

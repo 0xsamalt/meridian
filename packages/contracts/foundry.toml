@@ -1,0 +1,26 @@
+[profile.default]
+src     = "src"
+out     = "out"
+libs    = ["lib"]
+remappings = [
+  "@openzeppelin/=lib/openzeppelin-contracts/",
+  "forge-std/=lib/forge-std/src/"
+]
+solc_version = "0.8.24"
+optimizer    = true
+optimizer_runs = 200
+via_ir       = false
+
+[profile.fork]
+fork_url  = "${MANTLE_RPC}"
+fork_block_number = 0
+
+[profile.sepolia]
+fork_url = "${MANTLE_SEPOLIA_RPC}"
+
+[rpc_endpoints]
+mantle         = "${MANTLE_RPC}"
+mantle_sepolia = "${MANTLE_SEPOLIA_RPC}"
+
+[etherscan]
+mantle_sepolia = { key = "${MANTLESCAN_API_KEY}", url = "https://sepolia.mantlescan.xyz/api", chain = 5003 }

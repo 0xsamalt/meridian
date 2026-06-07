@@ -1,0 +1,23 @@
+# environment — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# foundry build artifacts
+packages/contracts/out/
+packages/contracts/cache/
+packages/contracts/broadcast/
+
+# node / frontend
+node_modules/
+packages/keeper/node_modules/
+packages/frontend/node_modules/
+packages/frontend/.next/
+packages/frontend/out/
+packages/frontend/.turbo/
+
+# misc
+.DS_Store
+*.log
+dist/
+Claude.md
