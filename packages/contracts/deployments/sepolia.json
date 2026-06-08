@@ -1,0 +1,17 @@
+{
+  "network": "mantle-sepolia",
+  "chainId": 5003,
+  "deployedAt": "39682900",
+  "deployer": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+  "contracts": {
+    "VaultCore":      "0x4E5E87367Df01CAb4959323155C452553A7b6490",
+    "CmethStrategy":  "0xdE415F6399f4DD9171d99410943924104BdDaa8F",
+    "AaveStrategy":   "0x50ff23E9A8D5DAc05744C367c9DDd588D027982B",
+    "MockCmETH":      "0x87aB1D5C1eBC0b627Bdc1e37C71789b6aa7C627b",
+    "MockAavePool":   "0x201B36B26b816D061fC552B679f8279Db0Fbbc6A",
+    "MockSwapRouter": "0x766DFCfbb6478Bf5B9375a0cfDa6575FcD22DB07",
+    "MockWETH":       "0x2348f027Dc1C4884a457cfA92472Bd5Ed67E3a70",
+    "MockUSDC":       "0xFB11dFD1F793201e3b6e301332fC9Cc5cAe44338",
+    "MockUSDY":       "0x44f44BB5064684AEd29AFCaFb06c17B2220E798B"
+  }
+}
