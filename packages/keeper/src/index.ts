@@ -1,4 +1,2 @@
-// Meridian keeper — scaffold
-// Session 2 will implement: signal fetch (Nansen + Elfa), allocation engine, rebalance tx
-
-export {};
+// Meridian keeper entry point — full implementation in Session 6
+export {}
