@@ -21,3 +21,5 @@ packages/frontend/.turbo/
 *.log
 dist/
 Claude.md
+CLAUDE.md
+.claude/
