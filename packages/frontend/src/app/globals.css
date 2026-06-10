@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "tnum" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Tabular numerals on all numeric spans */
+  .tabular-nums {
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0A0D12; }
+  ::-webkit-scrollbar-thumb { background: #222D40; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2A3550; }
+}
