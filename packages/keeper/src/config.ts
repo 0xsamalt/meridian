@@ -21,10 +21,8 @@ const envSchema = z.object({
   NANSEN_API_KEY: z.string().min(1),
   ELFA_API_KEY: z.string().min(1),
 
-  // Storacha UCAN auth — required at runtime for IPFS pinning (Session 6).
-  // Optional here so chain-only scripts (smoke test) work before setup.
-  STORACHA_AGENT_KEY: z.string().optional().default(''),
-  STORACHA_DELEGATION: z.string().optional().default(''),
+  PINATA_JWT: z.string().min(1),
+  ADMIN_SECRET: z.string().min(1),
 
   REBALANCE_INTERVAL_SECONDS: z
     .string()
