@@ -74,13 +74,15 @@ export async function readChainState(): Promise<ChainState> {
   const balResults = multicallResults.slice(n, 2 * n) as bigint[]
   const capResults = multicallResults.slice(2 * n, 3 * n) as bigint[]
 
-  const strategies: StrategyState[] = strategyAddresses.map((addr, i) => ({
-    key: STRATEGY_KEYS[addr.toLowerCase()] ?? addr,
-    address: addr,
-    apyBps: apyResults[i] ?? 0n,
-    balanceMeth: balResults[i] ?? 0n,
-    maxBps: capResults[i] ?? 0n,
-  }))
+  const strategies: StrategyState[] = strategyAddresses.map((addr, i) => {
+    const key = STRATEGY_KEYS[addr.toLowerCase()] ?? addr
+    // cmETH and USDY return hardcoded on-chain APYs (by design — no oracle).
+    // Apply keeper off-chain feed overrides per CONTRACTS.md §4.
+    let apyBps = apyResults[i] ?? 0n
+    if (key === 'cmeth') apyBps = BigInt(env.CMETH_APY_OVERRIDE_BPS)
+    if (key === 'usdy') apyBps = BigInt(env.USDY_APY_OVERRIDE_BPS)
+    return { key, address: addr, apyBps, balanceMeth: balResults[i] ?? 0n, maxBps: capResults[i] ?? 0n }
+  })
 
   return { totalAssets, idleMeth, lastRebalance, cooldownSecs, strategies }
 }

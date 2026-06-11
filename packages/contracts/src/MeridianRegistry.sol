@@ -2,11 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IERC8004Identity, IERC8004Reputation} from "./interfaces/IERC8004.sol";
 
 /// @notice Anchors the AI keeper's identity (ERC-8004) and an immutable on-chain decision log.
 /// Each rebalance is logged with its IPFS CID and a tamper-evident reasoningHash = keccak256(cid).
-contract MeridianRegistry is AccessControl {
+contract MeridianRegistry is AccessControl, IERC721Receiver {
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
 
     IERC8004Identity   public immutable identity;
@@ -76,4 +77,9 @@ contract MeridianRegistry is AccessControl {
 
     function decisionCount() external view returns (uint256) { return decisions.length; }
     function getDecision(uint256 i) external view returns (Decision memory) { return decisions[i]; }
+
+    // Required so identity.register() (_safeMint to this contract) succeeds.
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
+    }
 }

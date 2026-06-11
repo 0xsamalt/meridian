@@ -1,8 +1,11 @@
 import type { Logger } from 'pino'
 import type { Address, Hex } from 'viem'
 import { readChainState, simulateRebalance, submitRebalance } from './chain/vault.js'
+import type { ChainState } from './chain/vault.js'
 import { recordDecision } from './chain/registry.js'
 import { gatherSignals, makeDefaultCaches } from './signals/gather.js'
+import { fetchAaveWethSupplyRateBps } from './signals/aaveRate.js'
+import { syncMockRates } from './chain/mockSync.js'
 import type { GatherCaches } from './signals/gather.js'
 import { computeAllocation } from './engine/allocate.js'
 import { computePerfDelta, makeBaseline } from './engine/benchmark.js'
@@ -46,10 +49,31 @@ export async function runCycle(
       'chain state read',
     )
 
+    // Step 1b: fetch live Aave WETH supply rate and sync to MockAavePool (non-fatal)
+    log.info('Step 1b: fetching live Aave rate')
+    let liveAaveRateBps: number | undefined
+    try {
+      liveAaveRateBps = await fetchAaveWethSupplyRateBps()
+      const syncResult = await syncMockRates(liveAaveRateBps)
+      log.info({ aaveRateBps: liveAaveRateBps, synced: syncResult.synced }, 'Aave rate synced')
+    } catch (err) {
+      log.warn({ err: err instanceof Error ? err.message : String(err) }, 'Step 1b failed — continuing with on-chain rate')
+    }
+
+    // Produce a resolved chain state: apply live Aave APY so reasoning doc is accurate
+    const resolvedChainState: ChainState = {
+      ...chainState,
+      strategies: chainState.strategies.map((s) =>
+        s.key === 'aave' && liveAaveRateBps !== undefined
+          ? { ...s, apyBps: BigInt(liveAaveRateBps) }
+          : s,
+      ),
+    }
+
     // Initialise baseline on first cycle
     let baseline = state.baseline
     if (baseline === null) {
-      baseline = makeBaseline(chainState.totalAssets)
+      baseline = makeBaseline(resolvedChainState.totalAssets)
       log.info('baseline initialised')
     }
 
@@ -59,9 +83,9 @@ export async function runCycle(
     newCaches = caches
     log.info({ nansenStale: signals.nansenStale, elfaStale: signals.elfaStale }, 'signals gathered')
 
-    // Step 3: compute allocation
+    // Step 3: compute allocation (uses resolvedChainState so live Aave APY is applied)
     log.info('Step 3: computing allocation')
-    const snapshots: StrategySnapshot[] = chainState.strategies.map((s) => ({
+    const snapshots: StrategySnapshot[] = resolvedChainState.strategies.map((s) => ({
       key: s.key as StrategyKey,
       address: s.address,
       apyBps: Number(s.apyBps),
@@ -76,7 +100,7 @@ export async function runCycle(
     // Step 4: check rebalance conditions
     log.info('Step 4: checking rebalance conditions')
     const nowSecs = BigInt(Math.floor(Date.now() / 1000))
-    const cooldownEndsAt = chainState.lastRebalance + chainState.cooldownSecs
+    const cooldownEndsAt = resolvedChainState.lastRebalance + resolvedChainState.cooldownSecs
 
     if (nowSecs < cooldownEndsAt) {
       const waitSecs = Number(cooldownEndsAt - nowSecs)
@@ -87,9 +111,9 @@ export async function runCycle(
 
     // Skip if no strategy moves enough
     let maxDelta = 0
-    const totalAssets = chainState.totalAssets
+    const totalAssets = resolvedChainState.totalAssets
     if (totalAssets > 0n) {
-      for (const s of chainState.strategies) {
+      for (const s of resolvedChainState.strategies) {
         const currentBps = Number((s.balanceMeth * 10_000n) / totalAssets)
         const targetBps = allocation.targetBps[s.key] ?? 0
         maxDelta = Math.max(maxDelta, Math.abs(targetBps - currentBps))
@@ -104,15 +128,15 @@ export async function runCycle(
 
     // Step 5: build reasoning doc + pin to IPFS
     log.info('Step 5: pinning reasoning to IPFS')
-    const perfDeltaBps = computePerfDelta(chainState.totalAssets, baseline.vaultValueMeth)
-    const reasoningDoc = buildReasoningJson(chainState, signals, allocation, perfDeltaBps)
+    const perfDeltaBps = computePerfDelta(resolvedChainState.totalAssets, baseline.vaultValueMeth)
+    const reasoningDoc = buildReasoningJson(resolvedChainState, signals, allocation, perfDeltaBps)
     const { cid, reasoningHash } = await pinReasoning(reasoningDoc)
     log.info({ cid }, 'reasoning pinned')
 
     // Step 6: simulate + submit rebalance
     log.info('Step 6: submitting rebalance')
-    const stratAddresses: Address[] = chainState.strategies.map((s) => s.address)
-    const targetBpsArray: bigint[] = chainState.strategies.map(
+    const stratAddresses: Address[] = resolvedChainState.strategies.map((s) => s.address)
+    const targetBpsArray: bigint[] = resolvedChainState.strategies.map(
       (s) => BigInt(allocation.targetBps[s.key] ?? 0),
     )
     await simulateRebalance(stratAddresses, targetBpsArray, reasoningHash)
@@ -124,13 +148,13 @@ export async function runCycle(
     const decisionTxHash = await recordDecision(
       cid,
       BigInt(perfDeltaBps),
-      chainState.totalAssets,
+      resolvedChainState.totalAssets,
     )
     log.info({ decisionTxHash }, 'decision recorded')
 
     return {
       result: { rebalanced: true, rebalanceTxHash, decisionTxHash, cid },
-      state: { caches: newCaches, baseline: makeBaseline(chainState.totalAssets) },
+      state: { caches: newCaches, baseline: makeBaseline(resolvedChainState.totalAssets) },
     }
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)

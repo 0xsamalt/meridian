@@ -20,6 +20,9 @@ packages/frontend/.turbo/
 .DS_Store
 *.log
 dist/
+
+# claude / ai planning files
 Claude.md
 CLAUDE.md
+PLAN.md
 .claude/

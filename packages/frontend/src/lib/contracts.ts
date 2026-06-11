@@ -1,6 +1,6 @@
 // Mantle Sepolia — chain 5003
 export const VAULT_ADDRESS     = '0x2a339711221B33f9e5Ccd2e3811D3d00Eba020A7' as const
-export const REGISTRY_ADDRESS  = '0xf5bE0c99a828F4eAB72E743F883c22EB68caf5bE' as const
+export const REGISTRY_ADDRESS  = '0x27796e411769ebf9b365e8534bae3a03c5588cad' as const
 export const METH_ADDRESS      = '0x9EF6f9160Ba00B6621e5CB3217BB8b54a92B2828' as const
 export const CMETH_STRATEGY    = '0x87Af08833081B09222695133017d25c06eFAa12E' as const
 export const AAVE_STRATEGY     = '0x22923419faBE7853b3E4fE4fBE2C90EDc21DA090' as const

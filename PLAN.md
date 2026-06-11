@@ -1,17 +1,21 @@
 # Meridian — Session-by-Session Build Plan
 
 **Deadline:** June 15, 2026 (AI × RWA track, Turing Test 2026 on DoraHacks)
-**Status as of Session 3:**
+**Status as of Session 8:**
 
 | Layer | Status |
 |---|---|
 | Contracts (VaultCore, 3 strategies, Registry, 6 mocks) | ✅ Built + tested |
 | Deployed to Mantle Sepolia (deployer: 0x640CF727…) | ✅ Live |
 | Strategies wired to vault (addStrategy x3) | ✅ Done |
-| Keeper (`packages/keeper`) | ❌ Stub only |
-| Frontend (`packages/frontend`) | ❌ Empty |
-| Agent registration (ERC-8004 registerAgent) | ❌ Pending |
-| Demo / submission | ❌ Pending |
+| Keeper — chain layer (viem clients, vault reader, registry) | ✅ Done |
+| Keeper — allocation engine + Nansen/Elfa signals + tests | ✅ Done |
+| Keeper — cycle, IPFS (Pinata), cron, /trigger, Dockerfile | ✅ Done |
+| Frontend — scaffold + deposit/withdraw page (Session 7) | ✅ Done |
+| Frontend — dashboard + decisions + IPFS renderer (Session 8) | ✅ Done |
+| Keeper — real-world APY feed + Aave rate sync (Session 8b) | ✅ Done |
+| Agent registration (ERC-8004 registerAgent) | ✅ Done (agentId 146) |
+| Demo / submission | 🔄 In progress |
 
 **Deployed addresses (Mantle Sepolia, chain 5003):**
 ```
@@ -19,7 +23,7 @@ VaultCore:        0x2a339711221B33f9e5Ccd2e3811D3d00Eba020A7
 CmethStrategy:    0x87Af08833081B09222695133017d25c06eFAa12E
 AaveStrategy:     0x22923419faBE7853b3E4fE4fBE2C90EDc21DA090
 UsdyStrategy:     0x697b88a6BF3Df8D038b5685833f62646b1F1980a
-MeridianRegistry: 0xf5bE0c99a828F4eAB72E743F883c22EB68caf5bE
+MeridianRegistry: 0x27796e411769ebf9b365e8534bae3a03c5588cad
 MockCmETH:        0x718708c91d2e26E2EE531C4722A684b2D0d9e21e
 MockAavePool:     0x089Acb3d143a17B5Ae5375E743B140F14A3d1995
 MockSwapRouter:   0xf5b1954Cd83B707F3AB1ef1FA4ED184F0891D1cE
@@ -453,6 +457,129 @@ strategies, and a scrollable AI decision log that reconstructs reasoning from IP
 - IPFS reasoning blob renders correctly in the decision card.
 
 **Commit:** `feat(frontend): dashboard + AI decision log with IPFS reasoning renderer`
+
+---
+
+## Session 8b — Real-World APY Feed + Rate Sync
+
+**Goal:** Keeper reads live yield rates from real-world sources and mirrors them to
+the testnet mock contracts each cycle. This produces genuine, organic allocation shifts
+driven by actual Mantle DeFi market conditions — not synthetic drama.
+
+**Background (analysis Jun 11 2026):**
+
+Real-world APY snapshot vs current mock settings:
+
+| Asset | Real APY | Old Mock | Fix |
+|---|---|---|---|
+| cmETH | **5.00%** (500 bps) | 350 bps | Mock was wrong — cmETH is highest yielder |
+| USDY | **3.55%** (355 bps) | 500 bps | Mock was wrong — USDY dropped 110 bps (Fed cuts since Apr) |
+| Aave WETH on Mantle | **1.86%** today, **8.92%** Jun 8 spike | 30 bps (broken) | Volatile — syncing to mainnet data creates natural rebalances |
+
+Aave V3 WETH on Mantle swung 1.78% → 8.92% → 1.86% in one week (governance supply cap
+cut 80k→10k WETH on Jun 4 caused utilisation spike). When Aave exceeded cmETH (5%) on
+Jun 8, the agent should have shifted allocation. That's the demo story: real yield
+rotation detected and acted on by the AI agent.
+
+**Working directory:** `packages/keeper`
+
+**Step 0 — One-time fix (cast send, run immediately):**
+
+Fix Aave's broken mock rate (currently 30 bps → should be today's real 186 bps):
+```bash
+# 186 bps in ray-scaled units = 186 * 1e23 = 1.86e25
+cast send 0x089Acb3d143a17B5Ae5375E743B140F14A3d1995 \
+  "setLiquidityRate(uint256)" 18600000000000000000000000 \
+  --rpc-url https://rpc.sepolia.mantle.xyz \
+  --private-key $KEEPER_PRIVATE_KEY --legacy
+```
+
+Fix cmETH and USDY overrides in keeper config to match reality:
+```
+CMETH_APY_OVERRIDE_BPS=500    # 5.00% — mETH protocol published rate
+USDY_APY_OVERRIDE_BPS=355     # 3.55% — current T-bill rate minus Ondo fee
+```
+
+**Tasks:**
+
+1. **`src/signals/aaveRate.ts`** — `fetchAaveWethSupplyRateBps()`:
+   - Fetch live Aave V3 WETH supply APR from Aavescan API:
+     `GET https://aavescan.com/api/mantle-v3/reserve-history?asset=weth`
+   - Fallback: read `getReserveData(WETH_MAINNET)` directly from Mantle mainnet
+     Aave pool (`0x458F293454fE0d67EC0655f3672301301DD51422`) via a separate
+     `mainnetPublicClient` (read-only, no signing needed).
+   - Returns APY in bps (e.g. 186 for 1.86%).
+   - Wrapped in `fetchWithTimeout(8000)`. On failure, returns last cached value.
+   - Add `SignalCache<number>` for the Aave rate (same pattern as nansen/elfa caches).
+
+2. **`src/chain/mockSync.ts`** — `syncMockRates(aaveRateBps)`:
+   - Converts bps to ray-scaled units: `BigInt(aaveRateBps) * 10n**23n`
+   - Calls `MockAavePool.setLiquidityRate(rayValue)` via `walletClient`.
+   - Only calls if rate has changed by more than 10 bps since last sync (avoid
+     unnecessary txs).
+   - Guard: only runs when `NODE_ENV !== "production"` or `MOCK_SYNC_ENABLED=true`
+     so this code path can never fire against a real Aave pool.
+   - Returns `{ synced: boolean, newBps: number, txHash? }`.
+
+3. **`src/config.ts` additions:**
+   - `CMETH_APY_OVERRIDE_BPS` (default 500) — off-chain override for cmETH restaking APY.
+     Rationale from CONTRACTS.md §4: "restaking APY isn't on-chain readable; keeper
+     overrides via off-chain feed."
+   - `USDY_APY_OVERRIDE_BPS` (default 355) — off-chain override for USDY T-bill APY.
+   - `MOCK_SYNC_ENABLED` (default true on Sepolia) — gate for `mockSync.ts`.
+   - `AAVE_MAINNET_RPC` (optional) — Mantle mainnet RPC for direct on-chain rate read
+     as fallback to Aavescan API.
+
+4. **`src/chain/vault.ts` update — apply APY overrides:**
+   After reading `getCurrentAPY()` from each strategy, apply overrides where configured:
+   ```ts
+   // cmETH and USDY return hardcoded values on-chain (by design — no oracle).
+   // Keeper applies off-chain feed overrides per CONTRACTS.md §4 / KEEPER.md §2.
+   if (strategy.key === 'cmeth' && env.CMETH_APY_OVERRIDE_BPS)
+     strategy.apyBps = env.CMETH_APY_OVERRIDE_BPS
+   if (strategy.key === 'usdy' && env.USDY_APY_OVERRIDE_BPS)
+     strategy.apyBps = env.USDY_APY_OVERRIDE_BPS
+   ```
+
+5. **`src/cycle.ts` update — insert rate sync as Step 1b:**
+   ```
+   1.  readChainState()          → ChainState
+   1b. fetchAaveWethSupplyRateBps() → aaveRateBps (cached, safe)
+       syncMockRates(aaveRateBps)   → updates MockAavePool on-chain
+       apply APY overrides to ChainState strategies
+   2.  gatherSignals()           → Signals
+   ...
+   ```
+   Step 1b failure is non-fatal: log warning, keep existing mock rate, continue cycle.
+
+6. **`.env.example` additions:**
+   ```
+   CMETH_APY_OVERRIDE_BPS=500
+   USDY_APY_OVERRIDE_BPS=355
+   MOCK_SYNC_ENABLED=true
+   AAVE_MAINNET_RPC=https://rpc.mantle.xyz
+   ```
+
+7. **`test/mockSync.test.ts`** — unit tests:
+   - bps→ray conversion is correct (186 bps → 1.86e25)
+   - `syncMockRates` skips tx when rate change < 10 bps
+   - `syncMockRates` no-ops when `MOCK_SYNC_ENABLED=false`
+
+**Success criteria:**
+- `npm run dev` starts keeper; `/trigger` produces a cycle where the reasoning JSON
+  `inputs.apyBps` shows `cmeth: 500, usdy: 355, aave: <live rate>`.
+- Calling `/trigger` twice with Aave rate manually changed between calls produces
+  different target allocations.
+- `MockAavePool.mockLiquidityRate` on Sepolia updates to match real Mantle rate after cycle.
+
+**Demo narrative unlocked:**
+With this in place, the agent's decision log over 4 days will show:
+- Day 1 (Jun 11): cmETH=500, USDY=355, Aave=186 → cmETH dominant
+- Day 2 (if Aave recovers to ~370 avg): allocation shifts toward Aave
+- Days with Aave spike (like Jun 8 at 892 bps): Aave briefly exceeds cmETH → agent rebalances in
+- Normalisation: agent moves back to cmETH
+
+**Commit:** `feat(keeper): real-world APY feed — Aave rate sync + cmETH/USDY overrides`
 
 ---
 

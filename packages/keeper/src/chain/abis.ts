@@ -91,6 +91,23 @@ export const strategyAbi = [
   },
 ] as const
 
+export const mockAavePoolAbi = [
+  {
+    name: 'setLiquidityRate',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'rate', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    name: 'mockLiquidityRate',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const
+
 export const registryAbi = [
   {
     name: 'recordDecision',

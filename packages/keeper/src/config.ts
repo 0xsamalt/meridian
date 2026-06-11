@@ -36,6 +36,26 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => Number(v ?? '3600')),
+
+  // APY overrides: cmETH and USDY don't expose live rates on-chain (by design).
+  // Keeper applies off-chain feed values per CONTRACTS.md §4.
+  CMETH_APY_OVERRIDE_BPS: z
+    .string()
+    .optional()
+    .transform((v) => (v !== undefined ? Number(v) : 500)),
+  USDY_APY_OVERRIDE_BPS: z
+    .string()
+    .optional()
+    .transform((v) => (v !== undefined ? Number(v) : 355)),
+
+  // Mock rate sync — gates the setLiquidityRate write to MockAavePool
+  MOCK_SYNC_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v !== 'false'),
+
+  // Optional: Mantle mainnet RPC for live Aave rate fallback
+  AAVE_MAINNET_RPC: z.string().url().optional(),
 })
 
 function parseEnv() {
