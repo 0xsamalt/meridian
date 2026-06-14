@@ -39,11 +39,22 @@ export async function recordDecision(
   return hash
 }
 
+// Mantle Sepolia RPC caps eth_getLogs to 10,000 blocks per request.
+const LOG_RANGE = 9_000n
+
 export async function getDecisions(fromBlock?: bigint): Promise<DecisionLog[]> {
+  let start: bigint
+  if (fromBlock !== undefined) {
+    start = fromBlock
+  } else {
+    const latest = await publicClient.getBlockNumber()
+    start = latest > LOG_RANGE ? latest - LOG_RANGE : 0n
+  }
+
   const logs = await publicClient.getLogs({
     address: REGISTRY,
     event: decisionRecordedEvent,
-    fromBlock: fromBlock ?? 0n,
+    fromBlock: start,
     toBlock: 'latest',
   })
 

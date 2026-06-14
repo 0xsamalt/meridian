@@ -190,16 +190,10 @@ function DecisionCard({ d }: { d: Decision }) {
               {/* Benchmark — always visible */}
               <div className="rounded-md border border-meridian-border bg-meridian-surface-raised px-4 py-3">
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                  <span className="text-[13px] text-meridian-text-tertiary">Vault value</span>
+                  <span className="text-[13px] text-meridian-text-tertiary">Vault TVL</span>
                   <span className="tabular-nums text-right text-[13px] text-meridian-text-primary">
-                    {doc.benchmark.vaultValueMeth != null
-                      ? `${fmt(BigInt(doc.benchmark.vaultValueMeth), 4)} mETH`
-                      : '—'}
-                  </span>
-                  <span className="text-[13px] text-meridian-text-tertiary">Passive hold</span>
-                  <span className="tabular-nums text-right text-[13px] text-meridian-text-primary">
-                    {doc.benchmark.passiveHoldMeth != null
-                      ? `${fmt(BigInt(doc.benchmark.passiveHoldMeth), 4)} mETH`
+                    {doc.benchmark.totalAssetsMeth
+                      ? `${fmt(BigInt(doc.benchmark.totalAssetsMeth), 4)} mETH`
                       : '—'}
                   </span>
                   <span className="text-[13px] text-meridian-text-tertiary">Outperformance</span>
@@ -260,21 +254,21 @@ function DecisionCard({ d }: { d: Decision }) {
                       <div className="flex gap-4 text-[12px]">
                         <span
                           className={
-                            doc.inputs.stale.nansen
+                            doc.inputs.signals.nansenStale
                               ? 'text-meridian-warning'
                               : 'text-meridian-success'
                           }
                         >
-                          {doc.inputs.stale.nansen ? '⚠ Nansen stale' : '● Nansen live'}
+                          {doc.inputs.signals.nansenStale ? '⚠ Nansen stale' : '● Nansen live'}
                         </span>
                         <span
                           className={
-                            doc.inputs.stale.elfa
+                            doc.inputs.signals.elfaStale
                               ? 'text-meridian-warning'
                               : 'text-meridian-success'
                           }
                         >
-                          {doc.inputs.stale.elfa ? '⚠ Elfa stale' : '● Elfa live'}
+                          {doc.inputs.signals.elfaStale ? '⚠ Elfa stale' : '● Elfa live'}
                         </span>
                       </div>
                     </div>

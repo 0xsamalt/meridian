@@ -4,17 +4,24 @@ import { useEffect, useState } from 'react'
 import { useReadContract, usePublicClient } from 'wagmi'
 import { REGISTRY_ADDRESS, registryAbi } from '@/lib/contracts'
 
+// Matches the shape produced by keeper/src/reasoning/build.ts exactly
 export interface ReasoningDoc {
   version: string
-  timestamp: number
+  timestamp: string
   vault: string
-  totalAssetsMeth: string
   inputs: {
-    apyBps: Record<string, number>
-    balancesMeth: Record<string, string>
-    nansenNetflowUsd: Record<string, number>
-    elfaSentiment: Record<string, number | null>
-    stale: { nansen: boolean; elfa: boolean }
+    strategies: Array<{
+      key: string
+      apyBps: number
+      balanceMeth: string
+      maxBps: number
+    }>
+    signals: {
+      smartMoneyNetflowUsd: Record<string, number>
+      sentiment: Record<string, number | null>
+      nansenStale: boolean
+      elfaStale: boolean
+    }
   }
   scores: Record<string, number>
   decision: {
@@ -23,10 +30,18 @@ export interface ReasoningDoc {
   }
   rationale: string
   benchmark: {
-    passiveHoldMeth: string
-    vaultValueMeth: string
     perfDeltaBps: number
+    totalAssetsMeth: string
   }
+}
+
+// Local type for the MeridianRegistry.getDecision() return tuple
+type DecisionStruct = {
+  timestamp: bigint
+  reasoningHash: `0x${string}`
+  cid: string
+  perfDeltaBps: bigint
+  totalAssets: bigint
 }
 
 export interface Decision {
@@ -91,7 +106,7 @@ export function useDecisions(): { decisions: Decision[]; isLoading: boolean } {
             abi: registryAbi,
             functionName: 'getDecision',
             args: [BigInt(i)],
-          })
+          }).then((r) => r as DecisionStruct)
         )
       )
 
@@ -102,7 +117,7 @@ export function useDecisions(): { decisions: Decision[]; isLoading: boolean } {
         .map((s, i) => ({
           index: i,
           timestamp: Number(s.timestamp),
-          reasoningHash: s.reasoningHash as `0x${string}`,
+          reasoningHash: s.reasoningHash,
           cid: s.cid,
           perfDeltaBps: Number(s.perfDeltaBps),
           totalAssets: s.totalAssets,

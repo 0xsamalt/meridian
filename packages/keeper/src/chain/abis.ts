@@ -129,14 +129,30 @@ export const registryAbi = [
     outputs: [{ name: '', type: 'uint256' }],
   },
   {
+    name: 'getDecision',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'i', type: 'uint256' }],
+    outputs: [{
+      name: '',
+      type: 'tuple',
+      components: [
+        { name: 'timestamp',     type: 'uint64'  },
+        { name: 'reasoningHash', type: 'bytes32' },
+        { name: 'cid',           type: 'string'  },
+        { name: 'perfDeltaBps',  type: 'int256'  },
+        { name: 'totalAssets',   type: 'uint256' },
+      ],
+    }],
+  },
+  {
     name: 'DecisionRecorded',
     type: 'event',
     inputs: [
       { name: 'index', type: 'uint256', indexed: true },
-      { name: 'reasoningHash', type: 'bytes32', indexed: false },
+      { name: 'reasoningHash', type: 'bytes32', indexed: true },
       { name: 'cid', type: 'string', indexed: false },
       { name: 'perfDeltaBps', type: 'int256', indexed: false },
-      { name: 'timestamp', type: 'uint256', indexed: false },
     ],
   },
 ] as const

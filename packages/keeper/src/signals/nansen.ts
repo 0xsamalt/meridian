@@ -1,18 +1,20 @@
 import { z } from 'zod'
 import { env } from '../config.js'
 
-// Token addresses on Mantle Sepolia (testnet mocks)
+// Mantle mainnet token addresses — Nansen tracks chain-level holder behaviour,
+// not per-deployment contracts. Query mainnet addresses regardless of which
+// chain the vault is deployed on (testnet/mainnet).
 export const NANSEN_TOKENS = [
-  '0x9EF6f9160Ba00B6621e5CB3217BB8b54a92B2828', // mETH (testnet)
-  '0xfeA27e3b93fb1c8A4965168Cf1BbDe0492a60987', // MockWETH
-  '0x892C44ebd6f6f112Ce9C615BDB3E7102d41e08cd', // MockUSDC
+  '0xcDA86A272531e8640cD7F1a92c01839711B90bb0', // mETH mainnet
+  '0xdEAddEaDdeadDEadDEADDEAddEADDEAddead1111', // WETH mainnet
+  '0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9', // USDC mainnet
 ]
 
 // Maps lowercase address → canonical signal key (symbol)
 const ADDRESS_TO_SYMBOL: Record<string, string> = {
-  '0x9ef6f9160ba00b6621e5cb3217bb8b54a92b2828': 'mETH',
-  '0xfea27e3b93fb1c8a4965168cf1bbde0492a60987': 'WETH',
-  '0x892c44ebd6f6f112ce9c615bdb3e7102d41e08cd': 'USDC',
+  '0xcda86a272531e8640cd7f1a92c01839711b90bb0': 'mETH',
+  '0xdeaddeaddeaddeaddeaddeaddeaddeaddead1111': 'WETH',
+  '0x09bc4e0d864854c6afb6eb9a9cdf58ac190d0df9': 'USDC',
 }
 
 const NansenItemSchema = z.object({
