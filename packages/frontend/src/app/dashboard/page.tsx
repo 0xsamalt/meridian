@@ -2,235 +2,475 @@
 
 import Link from 'next/link'
 import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-} from 'recharts'
-import { ExternalLink, TrendingUp, ArrowRight, RefreshCw } from 'lucide-react'
+  IconArrowRight,
+  IconRefresh,
+  IconCheck,
+  IconExternalLink,
+  IconPointFilled,
+} from '@tabler/icons-react'
 import { motion } from 'framer-motion'
 import { useVaultState } from '@/hooks/useVaultState'
 import { useDecisions } from '@/hooks/useDecisions'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { fmt, fmtPct, fmtRelTime } from '@/lib/utils'
+import { fmt, fmtRelTime } from '@/lib/utils'
 import { EXPLORER, REGISTRY_ADDRESS } from '@/lib/contracts'
 
-// ── Animation variants ────────────────────────────────────────────────────────
+// ── Motion ────────────────────────────────────────────────────────────────────
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.35 } },
+const CARD_EASE = [0.16, 1, 0.3, 1] as const
+
+const cardVariant = {
+  hidden: { opacity: 0, y: 12 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.4, ease: CARD_EASE } },
 }
 
-const stagger = {
-  show: { transition: { staggerChildren: 0.08 } },
+const bentoStagger = {
+  hidden: {},
+  show:   { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
 }
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+// ── TVL card (2-col) ──────────────────────────────────────────────────────────
 
-function StatCard({
-  label,
-  value,
-  sub,
+function TvlCard({
+  totalAssets,
+  idleMeth,
   loading,
-  accent,
 }: {
-  label: string
-  value: string
-  sub?: string
-  loading?: boolean
-  accent?: 'positive' | 'negative' | 'neutral'
+  totalAssets: bigint
+  idleMeth: bigint
+  loading: boolean
 }) {
-  const accentCls =
-    accent === 'positive' ? 'text-yield' :
-    accent === 'negative' ? 'text-red-400' :
-    'text-foreground'
-
   return (
-    <motion.div variants={fadeUp}>
-      <Card className="h-full">
-        <CardContent className="pt-5">
-          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            {label}
-          </p>
+    <motion.div variants={cardVariant} className="lg:col-span-2">
+      <div
+        className="relative overflow-hidden rounded-card border border-meridian-border bg-meridian-surface p-5"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 60% at 90% 110%, rgba(59,130,246,0.07) 0%, transparent 60%), #12161F',
+        }}
+      >
+        {/* Label */}
+        <p className="font-mono text-[11px] uppercase tracking-widest text-meridian-text-tertiary">
+          Total Value Locked
+        </p>
+
+        {/* Big number */}
+        <div className="mt-3">
           {loading ? (
-            <>
-              <Skeleton className="mb-1 h-8 w-28" />
-              <Skeleton className="h-3 w-20" />
-            </>
+            <Skeleton className="h-12 w-44 bg-meridian-surface-raised" />
           ) : (
-            <>
-              <p className={`tabular-nums text-2xl font-semibold ${accentCls}`}>{value}</p>
-              {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
-            </>
+            <p className="tabular-nums text-[40px] font-semibold leading-none text-meridian-text-primary">
+              {fmt(totalAssets, 4)}
+              <span className="ml-2 text-[20px] font-normal text-meridian-text-tertiary">
+                mETH
+              </span>
+            </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Sub stats row */}
+        <div className="mt-4 flex items-center gap-4 border-t border-meridian-border pt-4">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary">
+              Idle buffer
+            </p>
+            {loading ? (
+              <Skeleton className="mt-1 h-4 w-20 bg-meridian-surface-raised" />
+            ) : (
+              <p className="mt-0.5 tabular-nums text-[13px] font-medium text-meridian-text-secondary">
+                {fmt(idleMeth, 4)} mETH
+              </p>
+            )}
+          </div>
+          <div className="h-6 w-px bg-meridian-border" />
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary">
+              Vault
+            </p>
+            <p className="mt-0.5 font-mono text-[11px] text-meridian-text-secondary">
+              ERC-4626
+            </p>
+          </div>
+          <div className="h-6 w-px bg-meridian-border" />
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary">
+              Network
+            </p>
+            <p className="mt-0.5 font-mono text-[11px] text-meridian-text-secondary">
+              Mantle
+            </p>
+          </div>
+        </div>
+      </div>
     </motion.div>
   )
 }
 
-// ── Custom Tooltip for recharts ───────────────────────────────────────────────
+// ── Share price + AI delta card (1-col) ───────────────────────────────────────
 
-function ChartTooltip({ active, payload }: { active?: boolean; payload?: { name: string; value: number; payload: { color: string } }[] }) {
-  if (!active || !payload?.length) return null
-  const { name, value, payload: entry } = payload[0]
+function SharePriceCard({
+  sharePrice,
+  latestPerf,
+  latestTimestamp,
+  loading,
+  perfLoading,
+}: {
+  sharePrice: bigint
+  latestPerf: number | null
+  latestTimestamp: number | null
+  loading: boolean
+  perfLoading: boolean
+}) {
+  const perfPositive = latestPerf !== null && latestPerf >= 0
+
   return (
-    <div className="rounded-lg border border-border bg-background/95 px-3 py-2 text-xs shadow-lg backdrop-blur-sm">
-      <span className="font-medium" style={{ color: entry.color }}>{name}</span>
-      <span className="ml-2 tabular-nums text-foreground">{value.toFixed(1)}%</span>
-    </div>
+    <motion.div variants={cardVariant} className="lg:col-span-1">
+      <div className="flex h-full flex-col rounded-card border border-meridian-border bg-meridian-surface p-5">
+        <p className="font-mono text-[11px] uppercase tracking-widest text-meridian-text-tertiary">
+          Share Price
+        </p>
+
+        <div className="mt-3 flex-1">
+          {loading ? (
+            <Skeleton className="h-8 w-28 bg-meridian-surface-raised" />
+          ) : (
+            <p className="tabular-nums text-[28px] font-semibold leading-none text-meridian-text-primary">
+              {fmt(sharePrice, 6)}
+              <span className="ml-1.5 text-[13px] font-normal text-meridian-text-tertiary">
+                mETH
+              </span>
+            </p>
+          )}
+          <p className="mt-1 text-[12px] text-meridian-text-tertiary">per mvmETH share</p>
+        </div>
+
+        {/* AI vs passive delta */}
+        <div className="mt-4 rounded-md border border-meridian-border bg-meridian-surface-raised px-3 py-2.5">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary">
+            AI vs passive hold
+          </p>
+          {perfLoading ? (
+            <Skeleton className="mt-1.5 h-5 w-16 bg-meridian-border" />
+          ) : latestPerf === null ? (
+            <p className="mt-1 text-[13px] text-meridian-text-tertiary">No data yet</p>
+          ) : (
+            <>
+              <p
+                className={`mt-0.5 tabular-nums text-[20px] font-semibold ${
+                  perfPositive ? 'text-meridian-success' : 'text-meridian-danger'
+                }`}
+              >
+                {perfPositive ? '+' : ''}
+                {(latestPerf / 100).toFixed(2)}%
+              </p>
+              {latestTimestamp && (
+                <p className="mt-0.5 text-[11px] text-meridian-text-tertiary">
+                  since {fmtRelTime(latestTimestamp)}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
-// ── Allocation donut ──────────────────────────────────────────────────────────
+// ── Allocation bars (2-col) ───────────────────────────────────────────────────
 
-function AllocationDonut({ strategies, idleMeth, totalAssets }: {
+function AllocationCard({
+  strategies,
+  idleMeth,
+  totalAssets,
+  loading,
+}: {
   strategies: ReturnType<typeof useVaultState>['strategies']
   idleMeth: bigint
   totalAssets: bigint
-}) {
-  const idlePct = totalAssets > 0n ? Number((idleMeth * 10000n) / totalAssets) / 100 : 0
-
-  const data = [
-    ...strategies.map((s) => ({
-      name: s.label,
-      value: s.allocationPct,
-      color: s.color,
-    })),
-    { name: 'Idle', value: idlePct, color: '#4B5563' },
-  ].filter((d) => d.value > 0)
-
-  if (totalAssets === 0n) {
-    return (
-      <div className="flex h-[180px] items-center justify-center text-sm text-muted-foreground">
-        No assets deposited yet
-      </div>
-    )
-  }
-
-  return (
-    <ResponsiveContainer width="100%" height={180}>
-      <PieChart>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius={55}
-          outerRadius={80}
-          paddingAngle={2}
-          dataKey="value"
-          strokeWidth={0}
-        >
-          {data.map((entry, i) => (
-            <Cell key={i} fill={entry.color} />
-          ))}
-        </Pie>
-        <Tooltip content={<ChartTooltip />} />
-      </PieChart>
-    </ResponsiveContainer>
-  )
-}
-
-// ── Strategy row ──────────────────────────────────────────────────────────────
-
-function StrategyRow({ s, loading }: {
-  s: ReturnType<typeof useVaultState>['strategies'][number]
   loading: boolean
 }) {
+  const idlePct =
+    totalAssets > 0n ? Number((idleMeth * 10000n) / totalAssets) / 100 : 0
+
+  const rows = [
+    ...strategies.map((s) => ({ label: s.label, pct: s.allocationPct, color: s.color })),
+    { label: 'Idle buffer', pct: idlePct, color: '#374151' },
+  ]
+
   return (
-    <tr className="border-b border-border last:border-0">
-      <td className="py-3 pr-4">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-          <span className="text-sm font-medium text-foreground">{s.label}</span>
+    <motion.div variants={cardVariant} className="lg:col-span-2">
+      <div className="rounded-card border border-meridian-border bg-meridian-surface p-5">
+        {/* Header */}
+        <div className="mb-5 flex items-center justify-between">
+          <p className="font-mono text-[11px] uppercase tracking-widest text-meridian-text-tertiary">
+            Live Allocation
+          </p>
+          <span className="rounded-pill border border-meridian-border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary">
+            3 strategies
+          </span>
         </div>
-      </td>
-      <td className="py-3 pr-4 text-right tabular-nums text-sm text-foreground">
-        {loading ? <Skeleton className="ml-auto h-4 w-16" /> : `${fmt(s.balanceMeth)} mETH`}
-      </td>
-      <td className="py-3 pr-4 text-right tabular-nums text-sm text-yield">
-        {loading ? <Skeleton className="ml-auto h-4 w-10" /> : `${fmtPct(s.apyBps)}`}
-      </td>
-      <td className="py-3 text-right text-sm">
-        {loading ? (
-          <Skeleton className="ml-auto h-4 w-12" />
+
+        {/* Bars */}
+        {!loading && totalAssets === 0n ? (
+          <div className="flex flex-col items-center justify-center py-8">
+            <p className="text-[13px] text-meridian-text-tertiary">No assets deposited yet</p>
+            <Link
+              href="/deposit"
+              className="mt-3 flex items-center gap-1 text-[13px] text-meridian-blue transition-colors hover:text-meridian-blue-light"
+            >
+              Deposit mETH
+              <IconArrowRight className="h-3.5 w-3.5" stroke={2} />
+            </Link>
+          </div>
         ) : (
-          <div className="flex items-center justify-end gap-2">
-            <div className="h-1.5 w-20 overflow-hidden rounded-full bg-border">
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${s.allocationPct}%`, background: s.color }}
-              />
-            </div>
-            <span className="tabular-nums text-muted-foreground">{s.allocationPct.toFixed(1)}%</span>
+          <div className="space-y-3.5">
+            {rows.map((row, i) => (
+              <div key={row.label}>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="font-mono text-[11px] uppercase tracking-widest text-meridian-text-secondary">
+                    {row.label}
+                  </span>
+                  <span className="tabular-nums text-[12px] font-medium text-meridian-text-primary">
+                    {loading ? '—' : `${row.pct.toFixed(1)}%`}
+                  </span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-meridian-surface-raised">
+                  {!loading && (
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ background: row.color }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${row.pct}%` }}
+                      transition={{
+                        duration: 0.7,
+                        ease: CARD_EASE,
+                        delay: 0.3 + i * 0.06,
+                      }}
+                    />
+                  )}
+                  {loading && (
+                    <Skeleton className="h-full w-full rounded-full bg-meridian-surface-raised" />
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
-      </td>
-      <td className="py-3 text-right">
-        <Badge variant="active" className="text-[10px]">Active</Badge>
-      </td>
-    </tr>
+
+        {/* Footer guardrails */}
+        <p className="mt-5 font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary">
+          Max 70% / strategy · 1h cooldown · nonReentrant
+        </p>
+      </div>
+    </motion.div>
   )
 }
 
-// ── Recent rebalances ─────────────────────────────────────────────────────────
+// ── Keeper status card (1-col) ────────────────────────────────────────────────
 
-function RecentRebalances({ decisions, loading }: {
+function KeeperStatusCard({
+  nextRebalanceIn,
+  isLoading,
+}: {
+  nextRebalanceIn: number | null
+  isLoading: boolean
+}) {
+  function fmtCountdown(secs: number): string {
+    if (secs <= 0) return 'Ready'
+    const h = Math.floor(secs / 3600)
+    const m = Math.floor((secs % 3600) / 60)
+    return h > 0 ? `${h}h ${m}m` : `${m}m`
+  }
+
+  const isReady = nextRebalanceIn !== null && nextRebalanceIn <= 0
+  const countdownStr =
+    nextRebalanceIn === null ? '—' : fmtCountdown(nextRebalanceIn)
+
+  return (
+    <motion.div variants={cardVariant} className="lg:col-span-1">
+      <div className="flex h-full flex-col rounded-card border border-meridian-border bg-meridian-surface p-5">
+
+        {/* Status dot + label */}
+        <div className="flex items-center gap-2">
+          <IconPointFilled
+            className={`h-3 w-3 ${isReady ? 'text-meridian-success' : 'text-meridian-blue'}`}
+          />
+          <p className="font-mono text-[11px] uppercase tracking-widest text-meridian-text-tertiary">
+            {isReady ? 'Keeper ready' : 'Keeper cooldown'}
+          </p>
+        </div>
+
+        {/* Countdown */}
+        <div className="mt-3 flex-1">
+          {isLoading ? (
+            <Skeleton className="h-10 w-24 bg-meridian-surface-raised" />
+          ) : (
+            <p className="font-mono tabular-nums text-[32px] font-medium leading-none text-meridian-text-primary">
+              {countdownStr}
+            </p>
+          )}
+          <p className="mt-1.5 text-[12px] text-meridian-text-tertiary">
+            {nextRebalanceIn === null
+              ? 'Waiting for first rebalance'
+              : isReady
+              ? 'Next rebalance can run now'
+              : 'Until next rebalance window'}
+          </p>
+        </div>
+
+        {/* Divider + CTA */}
+        <div className="mt-5 border-t border-meridian-border pt-4">
+          <Link
+            href="/deposit"
+            className="flex w-full items-center justify-center gap-2 rounded-control bg-meridian-blue px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#2563EB]"
+          >
+            Deposit mETH
+            <IconArrowRight className="h-3.5 w-3.5" stroke={2} />
+          </Link>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// ── Keeper activity feed (full width) ─────────────────────────────────────────
+
+function KeeperFeed({
+  decisions,
+  loading,
+}: {
   decisions: ReturnType<typeof useDecisions>['decisions']
   loading: boolean
 }) {
   const recent = decisions.slice(0, 5)
 
-  if (loading) {
-    return (
-      <div className="space-y-2.5">
-        {[...Array(3)].map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
-        ))}
-      </div>
-    )
-  }
-
-  if (recent.length === 0) {
-    return (
-      <p className="py-6 text-center text-sm text-muted-foreground">
-        No rebalances yet — the keeper runs every hour.
-      </p>
-    )
-  }
-
   return (
-    <div className="space-y-2">
-      {recent.map((d) => (
-        <div key={d.index} className="flex items-center justify-between rounded-md border border-border px-3 py-2.5 text-xs">
-          <div className="flex items-center gap-3">
-            <RefreshCw className="h-3.5 w-3.5 shrink-0 text-primary" />
-            <span className="text-muted-foreground">{fmtRelTime(d.timestamp)}</span>
-            <Badge
-              variant={d.reasoning?.decision.mode === 'defensive' ? 'outline' : 'active'}
-              className="text-[10px]"
-            >
-              {d.reasoning?.decision.mode ?? 'normal'}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={`tabular-nums font-medium ${d.perfDeltaBps >= 0 ? 'text-yield' : 'text-red-400'}`}>
-              {d.perfDeltaBps >= 0 ? '+' : ''}{(d.perfDeltaBps / 100).toFixed(2)}%
-            </span>
-            {d.cid && (
-              <a
-                href={`${EXPLORER}/address/${REGISTRY_ADDRESS}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
+    <motion.div variants={cardVariant} className="lg:col-span-3">
+      <div className="rounded-card border border-meridian-border bg-meridian-surface">
+
+        {/* Card header */}
+        <div className="flex items-center justify-between border-b border-meridian-border px-5 py-3.5">
+          <p className="font-mono text-[11px] uppercase tracking-widest text-meridian-text-tertiary">
+            Keeper Activity
+          </p>
+          <Link
+            href="/decisions"
+            className="flex items-center gap-1 text-[12px] text-meridian-blue transition-colors hover:text-meridian-blue-light"
+          >
+            Full AI log
+            <IconArrowRight className="h-3 w-3" stroke={2} />
+          </Link>
         </div>
-      ))}
-    </div>
+
+        {/* Body */}
+        <div className="px-5">
+          {loading && (
+            <div>
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 border-b border-meridian-border py-4 last:border-0"
+                >
+                  <Skeleton className="h-4 w-4 shrink-0 rounded-full bg-meridian-surface-raised" />
+                  <Skeleton className="h-4 flex-1 bg-meridian-surface-raised" />
+                  <Skeleton className="h-4 w-12 bg-meridian-surface-raised" />
+                  <Skeleton className="h-4 w-14 bg-meridian-surface-raised" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && recent.length === 0 && (
+            <div className="flex flex-col items-center py-10 text-center">
+              <p className="text-[13px] text-meridian-text-secondary">No keeper cycles yet</p>
+              <p className="mt-1 text-[12px] text-meridian-text-tertiary">
+                Runs every hour — first cycle will appear here.
+              </p>
+            </div>
+          )}
+
+          {!loading && recent.length > 0 && (
+            <div>
+              {recent.map((d, idx) => {
+                const isLast = idx === recent.length - 1
+                const mode = d.reasoning?.decision.mode
+                const isHeld = mode === 'defensive'
+                const isRebalance = mode === 'normal'
+
+                const Icon = isHeld ? IconCheck : isRebalance ? IconRefresh : IconArrowRight
+                const iconCls = isHeld
+                  ? 'text-meridian-success'
+                  : isRebalance
+                  ? 'text-meridian-text-secondary'
+                  : 'text-meridian-blue'
+
+                const actionLabel = isHeld
+                  ? 'Held — no rebalance needed'
+                  : isRebalance
+                  ? 'Rebalance executed'
+                  : 'Keeper action'
+
+                const perfPositive = d.perfDeltaBps >= 0
+
+                return (
+                  <div
+                    key={d.index}
+                    className={`flex items-center gap-4 py-3.5 ${
+                      isLast ? '' : 'border-b border-meridian-border'
+                    }`}
+                  >
+                    {/* Mode icon */}
+                    <Icon className={`h-3.5 w-3.5 shrink-0 ${iconCls}`} stroke={1.5} />
+
+                    {/* Action + CID */}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] text-meridian-text-primary">{actionLabel}</p>
+                      {d.cid && (
+                        <p className="mt-0.5 truncate font-mono text-[10px] text-meridian-text-tertiary">
+                          {d.cid.slice(0, 20)}…
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Decision # badge */}
+                    <span className="shrink-0 rounded-pill border border-meridian-border px-2 py-0.5 font-mono text-[10px] text-meridian-text-tertiary">
+                      #{d.index + 1}
+                    </span>
+
+                    {/* Perf delta */}
+                    <span
+                      className={`w-16 shrink-0 text-right tabular-nums text-[13px] font-semibold ${
+                        perfPositive ? 'text-meridian-success' : 'text-meridian-danger'
+                      }`}
+                    >
+                      {perfPositive ? '+' : ''}
+                      {(d.perfDeltaBps / 100).toFixed(2)}%
+                    </span>
+
+                    {/* Timestamp */}
+                    <span className="w-16 shrink-0 text-right font-mono text-[11px] text-meridian-text-tertiary">
+                      {fmtRelTime(d.timestamp)}
+                    </span>
+
+                    {/* On-chain link */}
+                    {d.cid && (
+                      <a
+                        href={`${EXPLORER}/address/${REGISTRY_ADDRESS}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 text-meridian-text-tertiary transition-colors hover:text-meridian-text-secondary"
+                      >
+                        <IconExternalLink className="h-3.5 w-3.5" stroke={1.5} />
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
@@ -240,172 +480,65 @@ export default function DashboardPage() {
   const vault = useVaultState()
   const { decisions, isLoading: decisionsLoading } = useDecisions()
 
-  const latestDecision = decisions[0]
+  const latestDecision = decisions[0] ?? null
   const latestPerf = latestDecision?.perfDeltaBps ?? null
+  const latestTimestamp = latestDecision?.timestamp ?? null
 
-  const nextRebalanceIn = vault.lastRebalance > 0n && vault.cooldown > 0n
-    ? Number(vault.lastRebalance + vault.cooldown) - Math.floor(Date.now() / 1000)
-    : null
-
-  function fmtCountdown(secs: number): string {
-    if (secs <= 0) return 'Ready'
-    const h = Math.floor(secs / 3600)
-    const m = Math.floor((secs % 3600) / 60)
-    return h > 0 ? `${h}h ${m}m` : `${m}m`
-  }
+  const nextRebalanceIn =
+    vault.lastRebalance > 0n && vault.cooldown > 0n
+      ? Number(vault.lastRebalance + vault.cooldown) - Math.floor(Date.now() / 1000)
+      : null
 
   return (
-    <div className="mx-auto max-w-[1200px] space-y-6">
-      {/* ── Header row ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Vault Dashboard</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Meridian mETH — AI-optimized yield across cmETH, Aave V3, and USDY
-          </p>
-        </div>
-        {nextRebalanceIn !== null && (
-          <div className="text-right text-xs text-muted-foreground">
-            <p>Next rebalance in</p>
-            <p className="tabular-nums text-base font-semibold text-foreground">
-              {fmtCountdown(nextRebalanceIn)}
-            </p>
-          </div>
-        )}
+    <div className="mx-auto max-w-content px-6 py-8">
+
+      {/* ── Page header ── */}
+      <div className="mb-6">
+        <h1 className="text-[24px] font-semibold text-meridian-text-primary">
+          Vault Dashboard
+        </h1>
+        <p className="mt-1 font-mono text-[11px] uppercase tracking-widest text-meridian-text-tertiary">
+          cmETH · Aave V3 · USDY · Mantle Sepolia
+        </p>
       </div>
 
-      {/* ── Stat cards ── */}
+      {/* ── Bento grid ── */}
       <motion.div
-        className="grid grid-cols-1 gap-4 sm:grid-cols-3"
-        variants={stagger}
+        className="grid grid-cols-1 gap-4 lg:grid-cols-3"
+        variants={bentoStagger}
         initial="hidden"
         animate="show"
       >
-        <StatCard
-          label="Total Value Locked"
-          value={`${fmt(vault.totalAssets, 4)} mETH`}
-          sub={`${fmt(vault.idleMeth, 4)} mETH idle buffer`}
+        {/* Row 1 */}
+        <TvlCard
+          totalAssets={vault.totalAssets}
+          idleMeth={vault.idleMeth}
           loading={vault.isLoading}
         />
-        <StatCard
-          label="Share Price"
-          value={`${fmt(vault.sharePrice, 6)} mETH`}
-          sub="per mvmETH share"
+        <SharePriceCard
+          sharePrice={vault.sharePrice}
+          latestPerf={latestPerf}
+          latestTimestamp={latestTimestamp}
+          loading={vault.isLoading}
+          perfLoading={decisionsLoading}
+        />
+
+        {/* Row 2 */}
+        <AllocationCard
+          strategies={vault.strategies}
+          idleMeth={vault.idleMeth}
+          totalAssets={vault.totalAssets}
           loading={vault.isLoading}
         />
-        <StatCard
-          label="AI vs Passive Hold"
-          value={
-            latestPerf === null
-              ? '—'
-              : `${latestPerf >= 0 ? '+' : ''}${(latestPerf / 100).toFixed(2)}%`
-          }
-          sub={latestDecision ? `since ${fmtRelTime(latestDecision.timestamp)}` : 'no decisions yet'}
-          loading={decisionsLoading}
-          accent={latestPerf === null ? 'neutral' : latestPerf >= 0 ? 'positive' : 'negative'}
+        <KeeperStatusCard
+          nextRebalanceIn={nextRebalanceIn}
+          isLoading={vault.isLoading}
         />
+
+        {/* Row 3 — full width */}
+        <KeeperFeed decisions={decisions} loading={decisionsLoading} />
       </motion.div>
 
-      {/* ── Allocation + strategy table ── */}
-      <motion.div
-        className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]"
-        variants={fadeUp}
-        initial="hidden"
-        animate="show"
-      >
-        {/* Donut */}
-        <Card>
-          <CardHeader className="pb-2">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-              Live Allocation
-            </p>
-          </CardHeader>
-          <CardContent className="pb-4 pt-0">
-            <AllocationDonut
-              strategies={vault.strategies}
-              idleMeth={vault.idleMeth}
-              totalAssets={vault.totalAssets}
-            />
-            {/* Legend */}
-            <div className="mt-3 space-y-1.5">
-              {vault.strategies.map((s) => (
-                <div key={s.key} className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-                    <span className="text-muted-foreground">{s.label}</span>
-                  </span>
-                  <span className="tabular-nums text-foreground">{s.allocationPct.toFixed(1)}%</span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#4B5563]" />
-                  <span className="text-muted-foreground">Idle</span>
-                </span>
-                <span className="tabular-nums text-foreground">
-                  {vault.totalAssets > 0n
-                    ? (Number((vault.idleMeth * 10000n) / vault.totalAssets) / 100).toFixed(1)
-                    : '0.0'}%
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Strategy table */}
-        <Card>
-          <CardHeader className="pb-2">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-              Strategy Breakdown
-            </p>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  {['Strategy', 'Balance', 'APY', 'Allocation', 'Status'].map((h) => (
-                    <th key={h} className="pb-2 text-right text-[10px] font-medium uppercase tracking-widest text-muted-foreground first:text-left">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {vault.strategies.map((s) => (
-                  <StrategyRow key={s.key} s={s} loading={vault.isLoading} />
-                ))}
-              </tbody>
-            </table>
-            <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
-              <TrendingUp className="h-3.5 w-3.5 text-yield" />
-              <span>Max 70% per strategy · 1h rebalance cooldown · nonReentrant vault</span>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* ── Recent rebalances ── */}
-      <motion.div variants={fadeUp} initial="hidden" animate="show">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                Recent Rebalances
-              </p>
-              <Link
-                href="/decisions"
-                className="flex items-center gap-1 text-xs text-primary transition-colors hover:text-primary/80"
-              >
-                View full AI log
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <RecentRebalances decisions={decisions} loading={decisionsLoading} />
-          </CardContent>
-        </Card>
-      </motion.div>
     </div>
   )
 }

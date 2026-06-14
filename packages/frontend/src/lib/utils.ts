@@ -11,6 +11,13 @@ export function fmt(wei: bigint | undefined, dp = 4): string {
   return n.toFixed(dp)
 }
 
+// VaultCore uses _decimalsOffset() = 6, so vault shares have 24 decimals
+export function fmtShares(wei: bigint | undefined, dp = 4): string {
+  if (wei === undefined) return '—'
+  const n = Number(wei) / 1e24
+  return n.toFixed(dp)
+}
+
 export function fmtPct(bps: number | bigint, dp = 2): string {
   return (Number(bps) / 100).toFixed(dp) + '%'
 }

@@ -1,18 +1,25 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip as RechartTooltip, ResponsiveContainer, Cell,
-} from 'recharts'
-import { ExternalLink, Brain, ShieldAlert, Clock, Loader2 } from 'lucide-react'
+  IconExternalLink,
+  IconBrain,
+  IconShieldExclamation,
+  IconClock,
+  IconLoader2,
+  IconChevronDown,
+  IconChevronUp,
+  IconArrowRight,
+  IconRefresh,
+  IconCheck,
+} from '@tabler/icons-react'
 import { useDecisions, type Decision } from '@/hooks/useDecisions'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { fmtRelTime, fmt } from '@/lib/utils'
 import { EXPLORER, REGISTRY_ADDRESS, STRATEGY_META } from '@/lib/contracts'
 
-// ── Animation variants ────────────────────────────────────────────────────────
+// ── Animation variants ─────────────────────────────────────────────────────────
 
 const cardVariants = {
   hidden: { opacity: 0, y: 24 },
@@ -24,43 +31,40 @@ const listVariants = {
   show: { transition: { staggerChildren: 0.1 } },
 }
 
-// ── Score bar chart ───────────────────────────────────────────────────────────
+// ── Score bar chart ────────────────────────────────────────────────────────────
 
 const STRATEGY_COLORS: Record<string, string> = {
   cmeth: '#3B82F6',
-  aave:  '#10B981',
-  usdy:  '#F59E0B',
+  aave:  '#185FA5',
+  usdy:  '#93C5FD',
 }
 
 function ScoreBars({ scores }: { scores: Record<string, number> }) {
-  const data = Object.entries(scores).map(([key, value]) => ({ key, value: +value.toFixed(2) }))
-  if (data.length === 0) return null
+  const entries = Object.entries(scores)
+  if (entries.length === 0) return null
+  const max = Math.max(...entries.map(([, v]) => v))
 
   return (
-    <ResponsiveContainer width="100%" height={80}>
-      <BarChart data={data} barSize={28} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
-        <XAxis
-          dataKey="key"
-          tick={{ fontSize: 10, fill: '#6B7280' }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis hide />
-        <RechartTooltip
-          cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-          contentStyle={{ background: '#0F1620', border: '1px solid #1E2D45', borderRadius: 6, fontSize: 11 }}
-        />
-        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-          {data.map((d) => (
-            <Cell key={d.key} fill={STRATEGY_COLORS[d.key] ?? '#6B7280'} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="space-y-2.5">
+      {entries.map(([key, value]) => (
+        <div key={key}>
+          <div className="mb-1 flex justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary">{key}</span>
+            <span className="tabular-nums text-[11px] text-meridian-text-secondary">{value.toFixed(2)}</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-meridian-surface-raised">
+            <div
+              className="h-full rounded-full transition-[width] duration-500"
+              style={{ width: `${(value / max) * 100}%`, background: STRATEGY_COLORS[key] ?? '#374151' }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 
-// ── Allocation delta row ──────────────────────────────────────────────────────
+// ── Allocation table ───────────────────────────────────────────────────────────
 
 function AllocationTable({ targetBps }: { targetBps: Record<string, number> }) {
   const rows = Object.entries(targetBps)
@@ -69,21 +73,28 @@ function AllocationTable({ targetBps }: { targetBps: Record<string, number> }) {
     <div className="grid grid-cols-4 gap-2">
       {rows.map(([key, bps]) => {
         const pct = bps / 100
-        const color = key === 'idle' ? '#4B5563' : (STRATEGY_COLORS[key] ?? '#6B7280')
+        const color =
+          key === 'idle' ? '#374151' : (STRATEGY_COLORS[key] ?? '#374151')
         const label =
-          key === 'idle' ? 'Idle' :
-          Object.values(STRATEGY_META).find((m) => m.key === key)?.label ?? key
+          key === 'idle'
+            ? 'Idle'
+            : Object.values(STRATEGY_META).find((m) => m.key === key)?.label ?? key
 
         return (
-          <div key={key} className="rounded-md border border-border p-2 text-center">
-            <div className="mb-1.5 h-1 w-full overflow-hidden rounded-full bg-border">
+          <div
+            key={key}
+            className="rounded-md border border-meridian-border bg-meridian-surface-raised p-2 text-center"
+          >
+            <div className="mb-1.5 h-1 w-full overflow-hidden rounded-full bg-meridian-border">
               <div
                 className="h-full rounded-full"
                 style={{ width: `${Math.min(pct, 100)}%`, background: color }}
               />
             </div>
-            <p className="tabular-nums text-sm font-semibold text-foreground">{pct.toFixed(1)}%</p>
-            <p className="truncate text-[10px] text-muted-foreground">{label}</p>
+            <p className="tabular-nums text-[13px] font-semibold text-meridian-text-primary">
+              {pct.toFixed(1)}%
+            </p>
+            <p className="truncate text-[11px] text-meridian-text-tertiary">{label}</p>
           </div>
         )
       })}
@@ -91,169 +102,250 @@ function AllocationTable({ targetBps }: { targetBps: Record<string, number> }) {
   )
 }
 
-// ── Single decision card ──────────────────────────────────────────────────────
+// ── Single decision card ───────────────────────────────────────────────────────
 
 function DecisionCard({ d }: { d: Decision }) {
+  const [expanded, setExpanded] = useState(false)
+
   const perfPositive = d.perfDeltaBps >= 0
   const doc = d.reasoning
+  const mode = doc?.decision.mode
+
+  const isHeld = mode === 'defensive'
+  const ModeIcon = isHeld ? IconCheck : IconRefresh
+  const modeLabel = isHeld ? 'defensive' : mode ?? 'normal'
+  const modeColor = isHeld ? 'text-meridian-success' : 'text-meridian-blue'
+  const modeBg = isHeld
+    ? 'border-meridian-success/30 bg-meridian-success/10'
+    : 'border-meridian-blue/30 bg-meridian-blue/10'
 
   return (
     <motion.div variants={cardVariants} layout>
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <Brain className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold text-foreground">
-                Decision #{d.index + 1}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {fmtRelTime(d.timestamp)}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              {doc && (
-                <Badge
-                  variant={doc.decision.mode === 'defensive' ? 'outline' : 'active'}
-                  className="text-[10px] uppercase tracking-wider"
-                >
-                  {doc.decision.mode === 'defensive' && (
-                    <ShieldAlert className="mr-1 h-2.5 w-2.5" />
-                  )}
-                  {doc.decision.mode}
-                </Badge>
-              )}
-              <span
-                className={`tabular-nums text-sm font-semibold ${perfPositive ? 'text-yield' : 'text-red-400'}`}
-              >
-                {perfPositive ? '+' : ''}{(d.perfDeltaBps / 100).toFixed(2)}%
-                <span className="ml-1 text-[10px] font-normal text-muted-foreground">vs hold</span>
-              </span>
-            </div>
-          </div>
-        </CardHeader>
+      <div className="overflow-hidden rounded-card border border-meridian-border bg-meridian-surface">
 
-        <CardContent className="space-y-4 pt-0">
+        {/* ── Card header ── */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <IconBrain className="h-4 w-4 text-meridian-blue" stroke={1.5} />
+            <span className="text-[14px] font-semibold text-meridian-text-primary">
+              Decision #{d.index + 1}
+            </span>
+            <span className="text-[13px] text-meridian-text-tertiary">
+              {fmtRelTime(d.timestamp)}
+            </span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            {doc && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-pill border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider ${modeBg} ${modeColor}`}
+              >
+                {isHeld && <IconShieldExclamation className="h-2.5 w-2.5" stroke={1.5} />}
+                {modeLabel}
+              </span>
+            )}
+            <span
+              className={`tabular-nums text-[14px] font-semibold ${
+                perfPositive ? 'text-meridian-success' : 'text-meridian-danger'
+              }`}
+            >
+              {perfPositive ? '+' : ''}
+              {(d.perfDeltaBps / 100).toFixed(2)}%
+              <span className="ml-1 text-[11px] font-normal text-meridian-text-tertiary">
+                vs hold
+              </span>
+            </span>
+          </div>
+        </div>
+
+        {/* ── Card body ── */}
+        <div className="space-y-4 border-t border-meridian-border px-5 pb-4 pt-4">
+
+          {/* IPFS loading skeleton */}
           {d.ipfsLoading && (
             <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-12 w-full bg-meridian-surface-raised" />
+              <Skeleton className="h-4 w-3/4 bg-meridian-surface-raised" />
+              <Skeleton className="h-4 w-1/2 bg-meridian-surface-raised" />
             </div>
           )}
 
+          {/* IPFS error */}
           {d.ipfsError && (
-            <p className="text-xs text-muted-foreground">
-              Could not fetch reasoning from IPFS — CID: <code className="font-mono text-foreground/60">{d.cid.slice(0, 16)}…</code>
+            <p className="text-[13px] text-meridian-text-tertiary">
+              Could not fetch reasoning from IPFS — CID:{' '}
+              <code className="font-mono text-meridian-text-secondary">
+                {d.cid.slice(0, 16)}…
+              </code>
             </p>
           )}
 
           {doc && (
             <>
-              {/* Allocation targets */}
+              {/* Allocation targets — always visible */}
               <div>
-                <p className="mb-2 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                  Target Allocation
-                </p>
+                <p className="mb-2 text-[13px] text-meridian-text-secondary">Target Allocation</p>
                 <AllocationTable targetBps={doc.decision.targetBps} />
               </div>
 
-              {/* Rationale */}
-              <div>
-                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                  AI Rationale
-                </p>
-                <p className="text-sm leading-relaxed text-foreground/80">{doc.rationale}</p>
-              </div>
-
-              {/* Score bars */}
-              {Object.keys(doc.scores).length > 0 && (
-                <div>
-                  <p className="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                    Raw Scores (pre-normalization)
-                  </p>
-                  <ScoreBars scores={doc.scores} />
-                </div>
-              )}
-
-              {/* Signal freshness */}
-              <div className="flex gap-3 text-[10px]">
-                <span className={doc.inputs.stale.nansen ? 'text-yellow-500' : 'text-yield'}>
-                  {doc.inputs.stale.nansen ? '⚠ Nansen stale' : '● Nansen live'}
-                </span>
-                <span className={doc.inputs.stale.elfa ? 'text-yellow-500' : 'text-yield'}>
-                  {doc.inputs.stale.elfa ? '⚠ Elfa stale' : '● Elfa live'}
-                </span>
-              </div>
-
-              {/* Benchmark */}
-              <div className="rounded-md border border-border px-3 py-2 text-xs">
-                <div className="grid grid-cols-2 gap-x-6 gap-y-0.5">
-                  <span className="text-muted-foreground">Vault value</span>
-                  <span className="tabular-nums text-right text-foreground">
-                    {fmt(BigInt(doc.benchmark.vaultValueMeth), 4)} mETH
+              {/* Benchmark — always visible */}
+              <div className="rounded-md border border-meridian-border bg-meridian-surface-raised px-4 py-3">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+                  <span className="text-[13px] text-meridian-text-tertiary">Vault value</span>
+                  <span className="tabular-nums text-right text-[13px] text-meridian-text-primary">
+                    {doc.benchmark.vaultValueMeth != null
+                      ? `${fmt(BigInt(doc.benchmark.vaultValueMeth), 4)} mETH`
+                      : '—'}
                   </span>
-                  <span className="text-muted-foreground">Passive hold</span>
-                  <span className="tabular-nums text-right text-foreground">
-                    {fmt(BigInt(doc.benchmark.passiveHoldMeth), 4)} mETH
+                  <span className="text-[13px] text-meridian-text-tertiary">Passive hold</span>
+                  <span className="tabular-nums text-right text-[13px] text-meridian-text-primary">
+                    {doc.benchmark.passiveHoldMeth != null
+                      ? `${fmt(BigInt(doc.benchmark.passiveHoldMeth), 4)} mETH`
+                      : '—'}
                   </span>
-                  <span className="text-muted-foreground">Outperformance</span>
-                  <span className={`tabular-nums text-right font-semibold ${doc.benchmark.perfDeltaBps >= 0 ? 'text-yield' : 'text-red-400'}`}>
-                    {doc.benchmark.perfDeltaBps >= 0 ? '+' : ''}{(doc.benchmark.perfDeltaBps / 100).toFixed(2)}%
+                  <span className="text-[13px] text-meridian-text-tertiary">Outperformance</span>
+                  <span
+                    className={`tabular-nums text-right text-[13px] font-semibold ${
+                      doc.benchmark.perfDeltaBps >= 0
+                        ? 'text-meridian-success'
+                        : 'text-meridian-danger'
+                    }`}
+                  >
+                    {doc.benchmark.perfDeltaBps >= 0 ? '+' : ''}
+                    {(doc.benchmark.perfDeltaBps / 100).toFixed(2)}%
                   </span>
                 </div>
               </div>
+
+              {/* Expand / collapse toggle for full reasoning */}
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="flex w-full items-center justify-between rounded-md border border-meridian-border bg-meridian-surface-raised px-4 py-2.5 font-mono text-[10px] uppercase tracking-widest text-meridian-text-secondary transition-colors hover:border-meridian-border-hover hover:text-meridian-text-primary"
+              >
+                <span>AI Reasoning</span>
+                {expanded ? (
+                  <IconChevronUp className="h-4 w-4" stroke={1.5} />
+                ) : (
+                  <IconChevronDown className="h-4 w-4" stroke={1.5} />
+                )}
+              </button>
+
+              <AnimatePresence initial={false}>
+                {expanded && (
+                  <motion.div
+                    key="reasoning"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-4 pt-1">
+                      {/* Rationale text */}
+                      <p className="text-[14px] leading-relaxed text-meridian-text-secondary">
+                        {doc.rationale}
+                      </p>
+
+                      {/* Score bars */}
+                      {Object.keys(doc.scores).length > 0 && (
+                        <div>
+                          <p className="mb-2 text-[13px] text-meridian-text-tertiary">
+                            Raw Scores (pre-normalization)
+                          </p>
+                          <ScoreBars scores={doc.scores} />
+                        </div>
+                      )}
+
+                      {/* Signal freshness */}
+                      <div className="flex gap-4 text-[12px]">
+                        <span
+                          className={
+                            doc.inputs.stale.nansen
+                              ? 'text-meridian-warning'
+                              : 'text-meridian-success'
+                          }
+                        >
+                          {doc.inputs.stale.nansen ? '⚠ Nansen stale' : '● Nansen live'}
+                        </span>
+                        <span
+                          className={
+                            doc.inputs.stale.elfa
+                              ? 'text-meridian-warning'
+                              : 'text-meridian-success'
+                          }
+                        >
+                          {doc.inputs.stale.elfa ? '⚠ Elfa stale' : '● Elfa live'}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </>
           )}
 
-          {/* Footer: IPFS + on-chain links */}
-          <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3 text-[10px] text-muted-foreground">
-            <Clock className="h-3 w-3 shrink-0" />
+          {/* Footer: timestamp + IPFS + on-chain links */}
+          <div className="flex flex-wrap items-center gap-3 border-t border-meridian-border pt-3 text-[12px] text-meridian-text-tertiary">
+            <IconClock className="h-3.5 w-3.5 shrink-0" stroke={1.5} />
             <span className="font-mono">{new Date(d.timestamp * 1000).toISOString()}</span>
             {d.cid && (
-              <a
-                href={`https://w3s.link/ipfs/${d.cid}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-auto flex items-center gap-1 transition-colors hover:text-foreground"
-              >
-                IPFS reasoning <ExternalLink className="h-2.5 w-2.5" />
-              </a>
+              <>
+                <span className="rounded-md bg-meridian-surface-raised px-2 py-0.5 font-mono text-[10px] text-meridian-text-secondary">{d.cid.slice(0, 20)}…</span>
+                <a
+                  href={`https://w3s.link/ipfs/${d.cid}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto flex items-center gap-1 transition-colors hover:text-meridian-text-secondary"
+                >
+                  IPFS reasoning
+                  <IconExternalLink className="h-3 w-3" stroke={1.5} />
+                </a>
+              </>
             )}
+            <a
+              href={`${EXPLORER}/address/${REGISTRY_ADDRESS}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 transition-colors hover:text-meridian-text-secondary"
+            >
+              On-chain
+              <IconExternalLink className="h-3 w-3" stroke={1.5} />
+            </a>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </motion.div>
   )
 }
 
-// ── Loading skeleton ──────────────────────────────────────────────────────────
+// ── Loading skeleton ───────────────────────────────────────────────────────────
 
 function DecisionSkeleton() {
   return (
-    <Card className="space-y-3 p-5">
+    <div className="space-y-3 rounded-card border border-meridian-border bg-meridian-surface p-5">
       <div className="flex items-center justify-between">
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-4 w-32 bg-meridian-surface-raised" />
+        <Skeleton className="h-4 w-16 bg-meridian-surface-raised" />
       </div>
-      <Skeleton className="h-16 w-full" />
-      <Skeleton className="h-4 w-3/4" />
-      <Skeleton className="h-4 w-1/2" />
-    </Card>
+      <Skeleton className="h-16 w-full bg-meridian-surface-raised" />
+      <Skeleton className="h-4 w-3/4 bg-meridian-surface-raised" />
+      <Skeleton className="h-4 w-1/2 bg-meridian-surface-raised" />
+    </div>
   )
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function DecisionsPage() {
   const { decisions, isLoading } = useDecisions()
 
   return (
-    <div className="mx-auto max-w-[900px] space-y-6">
-      {/* Header */}
+    <div className="mx-auto max-w-content space-y-6 px-6 py-8">
+
+      {/* Page title */}
       <div>
-        <h1 className="text-xl font-semibold text-foreground">AI Decision Log</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
+        <h1 className="text-[24px] font-semibold text-meridian-text-primary">AI Decision Log</h1>
+        <p className="mt-1 text-[14px] leading-relaxed text-meridian-text-secondary">
           Every rebalance is transparent and verifiable — reasoning pinned to IPFS, hash anchored on-chain.
         </p>
       </div>
@@ -269,34 +361,42 @@ export default function DecisionsPage() {
 
       {/* Empty state */}
       {!isLoading && decisions.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center py-16 text-center">
-            <Brain className="mb-4 h-10 w-10 text-muted-foreground/40" />
-            <p className="text-base font-medium text-foreground">No rebalances recorded yet</p>
-            <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-              The keeper runs every hour. Once it triggers a rebalance, each decision
-              will appear here with the full AI reasoning, scores, and on-chain proof.
+        <div className="rounded-card border border-meridian-border bg-meridian-surface">
+          <div className="flex flex-col items-center px-6 py-16 text-center">
+            <svg width="48" height="42" viewBox="0 0 32 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-4 opacity-20">
+              <circle cx="13" cy="14" r="10" stroke="#93C5FD" strokeWidth="3.5" fill="none" />
+              <circle cx="19" cy="14" r="10" stroke="#3B82F6" strokeWidth="3.5" fill="none" />
+            </svg>
+            <p className="text-[15px] font-medium text-meridian-text-primary">
+              No rebalances recorded yet
+            </p>
+            <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-meridian-text-secondary">
+              The keeper runs every hour. Once it triggers a rebalance, each decision will appear
+              here with the full AI reasoning, scores, and on-chain proof.
             </p>
             <a
               href={`${EXPLORER}/address/${REGISTRY_ADDRESS}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-6 flex items-center gap-1.5 text-xs text-primary transition-colors hover:text-primary/80"
+              className="mt-6 flex items-center gap-1.5 text-[13px] text-meridian-blue transition-colors hover:text-meridian-blue-light"
             >
-              View registry on Mantlescan <ExternalLink className="h-3 w-3" />
+              View registry on Mantlescan
+              <IconExternalLink className="h-3.5 w-3.5" stroke={1.5} />
             </a>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Decision list */}
       {!isLoading && decisions.length > 0 && (
         <>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{decisions.length} decision{decisions.length !== 1 ? 's' : ''} recorded</span>
+          <div className="flex items-center justify-between text-[13px] text-meridian-text-tertiary">
+            <span>
+              {decisions.length} decision{decisions.length !== 1 ? 's' : ''} recorded
+            </span>
             {decisions.some((d) => d.ipfsLoading) && (
               <span className="flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <IconLoader2 className="h-3.5 w-3.5 animate-spin" stroke={1.5} />
                 Fetching IPFS reasoning…
               </span>
             )}

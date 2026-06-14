@@ -84,9 +84,10 @@ export function useVaultState(): VaultState {
   const deployedMeth = balances.reduce((acc, b) => acc + b, 0n)
   const idleMeth = totalAssets > deployedMeth ? totalAssets - deployedMeth : 0n
 
+  // totalSupply is 24-decimal (18 + _decimalsOffset 6); multiply by 1e24 so result stays in 1e18 scale
   const sharePrice =
     totalAssets > 0n && totalSupply > 0n
-      ? (totalAssets * BigInt(1e18)) / totalSupply
+      ? (totalAssets * 1_000_000_000_000_000_000_000_000n) / totalSupply
       : BigInt(1e18)
 
   const strategies: StrategyState[] = STRATEGIES.map((addr, i) => {

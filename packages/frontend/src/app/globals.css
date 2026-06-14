@@ -2,31 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes ring-spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Named classes so CSS prefers-reduced-motion works (inline styles bypass it) */
+.ring-spin-a { animation: ring-spin-slow 90s linear infinite reverse; }
+.ring-spin-b { animation: ring-spin-slow 55s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ring-spin-a,
+  .ring-spin-b,
+  .animate-ring-slow,
+  .animate-ring-slow-reverse {
+    animation: none !important;
+  }
+}
+
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   * {
-    @apply border-border;
     box-sizing: border-box;
+    border-color: rgba(255, 255, 255, 0.08);
   }
 
   html {
     color-scheme: dark;
   }
 
+  ::selection {
+    background: rgba(59, 130, 246, 0.25);
+    color: #F5F7FA;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    background-color: #0A0E14;
+    color: #F5F7FA;
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    /* Tabular numerals globally — prevents digit-jitter on live values */
     font-feature-settings: "tnum" 1;
+    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Tabular numerals on all numeric spans */
-  .tabular-nums {
+  /* Tabular-nums on numeric contexts */
+  input, button, table, .font-mono, .font-sans, .tabular-nums {
+    font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
   }
 
-  /* Scrollbar */
+  /* Custom scrollbar */
   ::-webkit-scrollbar       { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: #0A0D12; }
-  ::-webkit-scrollbar-thumb { background: #222D40; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #2A3550; }
+  ::-webkit-scrollbar-track { background: #0A0E14; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+  /* Focus ring — always visible, never removed */
+  :focus-visible {
+    outline: 2px solid #3B82F6;
+    outline-offset: 2px;
+  }
 }
