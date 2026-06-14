@@ -41,17 +41,23 @@ export interface Decision {
   ipfsError: boolean
 }
 
-const IPFS_GATEWAY = 'https://w3s.link/ipfs/'
+const IPFS_GATEWAYS = [
+  'https://dweb.link/ipfs/',
+  'https://gateway.pinata.cloud/ipfs/',
+  'https://ipfs.io/ipfs/',
+]
 const REFETCH_MS = 30_000
 
 async function fetchIpfsDoc(cid: string): Promise<ReasoningDoc | null> {
-  try {
-    const res = await fetch(`${IPFS_GATEWAY}${cid}`, { signal: AbortSignal.timeout(12_000) })
-    if (!res.ok) return null
-    return (await res.json()) as ReasoningDoc
-  } catch {
-    return null
+  for (const gateway of IPFS_GATEWAYS) {
+    try {
+      const res = await fetch(`${gateway}${cid}`, { signal: AbortSignal.timeout(12_000) })
+      if (res.ok) return (await res.json()) as ReasoningDoc
+    } catch {
+      // try next gateway
+    }
   }
+  return null
 }
 
 export function useDecisions(): { decisions: Decision[]; isLoading: boolean } {

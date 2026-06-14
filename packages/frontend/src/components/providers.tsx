@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ConnectKitProvider } from 'connectkit'
 import { wagmiConfig } from '@/lib/wagmi'
 import { useState } from 'react'
+import { TxToastProvider } from '@/contexts/TxToastContext'
+import { TxToast } from '@/components/TxToast'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
@@ -12,7 +14,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <ConnectKitProvider theme="midnight">
-          {children}
+          <TxToastProvider>
+            {children}
+            <TxToast />
+          </TxToastProvider>
         </ConnectKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
