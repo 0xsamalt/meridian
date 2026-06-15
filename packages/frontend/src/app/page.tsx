@@ -200,6 +200,14 @@ function CidVisual() {
           0x3f9a…e84c
         </p>
       </div>
+      <div className="rounded-md border border-meridian-border bg-meridian-surface-raised px-3 py-2">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary">
+          ERC-8004 Agent
+        </p>
+        <p className="mt-1 font-mono text-[11px] text-meridian-text-secondary">
+          #146 · Mantle Sepolia · reputation accruing
+        </p>
+      </div>
     </div>
   )
 }

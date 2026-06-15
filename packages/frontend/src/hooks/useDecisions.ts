@@ -88,7 +88,7 @@ export function useDecisions(): { decisions: Decision[]; isLoading: boolean } {
 
   const count = Number(countData ?? 0n)
 
-  // Step 2: batch-read all decision structs (avoids usePublicClient which can return undefined)
+  // Step 2: batch-read all decision structs
   const contracts = useMemo(
     () =>
       Array.from({ length: count }, (_, i) => ({
@@ -106,58 +106,74 @@ export function useDecisions(): { decisions: Decision[]; isLoading: boolean } {
     query: { enabled: count > 0, refetchInterval: REFETCH_MS },
   })
 
-  // Persist IPFS docs across refetches so we don't re-fetch on every 30s poll
+  // Persist IPFS docs across refetches so we never re-fetch the same CID
   const ipfsCacheRef = useRef<Map<string, ReasoningDoc | null>>(new Map())
 
   const [decisions, setDecisions] = useState<Decision[]>([])
+  // ipfsReady tracks whether the current rawDecisions batch has been fully
+  // resolved (chain structs + all IPFS blobs). Starts false; set to true
+  // only after a complete commit so isLoading never flips false prematurely.
+  const [ipfsReady, setIpfsReady] = useState(false)
 
   useEffect(() => {
+    // While chain data is still in flight, leave ipfsReady as-is so we don't
+    // show a skeleton flash during background 30s refetches of already-loaded data.
     if (countLoading || decisionsLoading || !rawDecisions) return
 
-    const ipfsCache = ipfsCacheRef.current
+    const cache = ipfsCacheRef.current
     let cancelled = false
 
-    const initial: Decision[] = rawDecisions
+    const structs = rawDecisions
       .map((r, i) => {
         const s = r.result as unknown as DecisionStruct | undefined
-        if (!s) return null
-        const hasCached = ipfsCache.has(s.cid)
-        const cachedDoc = ipfsCache.get(s.cid) ?? null
+        return s ? { index: i, s } : null
+      })
+      .filter((d): d is { index: number; s: DecisionStruct } => d !== null)
+      .reverse()
+
+    const missing = structs.filter(({ s }) => s.cid && !cache.has(s.cid))
+
+    const buildDecisions = (): Decision[] =>
+      structs.map(({ index, s }) => {
+        const cached = cache.get(s.cid) ?? null
         return {
-          index: i,
+          index,
           timestamp: Number(s.timestamp),
           reasoningHash: s.reasoningHash,
           cid: s.cid,
           perfDeltaBps: Number(s.perfDeltaBps),
           totalAssets: s.totalAssets,
-          reasoning: hasCached ? cachedDoc : null,
-          ipfsLoading: !hasCached && !!s.cid,
-          ipfsError: hasCached && cachedDoc === null && !!s.cid,
+          reasoning: cached,
+          ipfsLoading: false,
+          ipfsError: cache.has(s.cid) && cached === null && !!s.cid,
         }
       })
-      .filter((d): d is Decision => d !== null)
-      .reverse()
 
-    setDecisions(initial)
-
-    // Fetch IPFS blobs for any decision not yet cached, updating state as each arrives
-    for (const d of initial) {
-      if (!d.cid || ipfsCache.has(d.cid)) continue
-      fetchIpfsDoc(d.cid).then((doc) => {
-        ipfsCache.set(d.cid, doc) // cache before the cancelled check so refetches skip it
-        if (cancelled) return
-        setDecisions((prev) =>
-          prev.map((p) =>
-            p.index === d.index
-              ? { ...p, reasoning: doc, ipfsLoading: false, ipfsError: doc === null }
-              : p
-          )
-        )
-      })
+    if (missing.length === 0) {
+      // All blobs are cached — commit immediately in one render
+      setDecisions(buildDecisions())
+      setIpfsReady(true)
+      return
     }
+
+    // New blobs needed: mark not ready, fetch all in parallel, commit once
+    setIpfsReady(false)
+    Promise.all(
+      missing.map(({ s }) =>
+        fetchIpfsDoc(s.cid).then((doc) => { cache.set(s.cid, doc) })
+      )
+    ).then(() => {
+      if (cancelled) return
+      setDecisions(buildDecisions())
+      setIpfsReady(true)
+    })
 
     return () => { cancelled = true }
   }, [rawDecisions, countLoading, decisionsLoading])
 
-  return { decisions, isLoading: countLoading || (count > 0 && decisionsLoading) }
+  // count > 0 check: when there are no decisions yet, ipfsReady stays false
+  // but we still want isLoading to resolve once chain confirms count = 0.
+  const isLoading = countLoading || (count > 0 && (decisionsLoading || !ipfsReady))
+
+  return { decisions, isLoading }
 }

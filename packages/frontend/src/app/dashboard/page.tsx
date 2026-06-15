@@ -10,7 +10,7 @@ import {
 } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
 import { useVaultState } from '@/hooks/useVaultState'
-import { useDecisions } from '@/hooks/useDecisions'
+import { useDecisions, type Decision } from '@/hooks/useDecisions'
 import { Skeleton } from '@/components/ui/skeleton'
 import { fmt, fmtRelTime } from '@/lib/utils'
 import { EXPLORER, REGISTRY_ADDRESS } from '@/lib/contracts'
@@ -183,19 +183,35 @@ function AllocationCard({
   idleMeth,
   totalAssets,
   loading,
+  latestDecision,
 }: {
   strategies: ReturnType<typeof useVaultState>['strategies']
   idleMeth: bigint
   totalAssets: bigint
   loading: boolean
+  latestDecision: Decision | null
 }) {
-  const idlePct =
-    totalAssets > 0n ? Number((idleMeth * 10000n) / totalAssets) / 100 : 0
+  const targetBps = latestDecision?.reasoning?.decision?.targetBps ?? null
 
-  const rows = [
-    ...strategies.map((s) => ({ label: s.label, pct: s.allocationPct, color: s.color })),
-    { label: 'Idle buffer', pct: idlePct, color: '#374151' },
-  ]
+  const rows = targetBps
+    ? [
+        ...strategies.map((s) => ({
+          label: s.label,
+          pct: (targetBps[s.key] ?? 0) / 100,
+          color: s.color,
+        })),
+        { label: 'Idle buffer', pct: (targetBps['idle'] ?? 0) / 100, color: '#374151' },
+      ]
+    : [
+        ...strategies.map((s) => ({ label: s.label, pct: s.allocationPct, color: s.color })),
+        {
+          label: 'Idle buffer',
+          pct: totalAssets > 0n ? Number((idleMeth * 10000n) / totalAssets) / 100 : 0,
+          color: '#374151',
+        },
+      ]
+
+  const cardLabel = targetBps ? 'Target Allocation' : 'Live Allocation'
 
   return (
     <motion.div variants={cardVariant} className="lg:col-span-2">
@@ -203,7 +219,7 @@ function AllocationCard({
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
           <p className="font-mono text-[11px] uppercase tracking-widest text-meridian-text-tertiary">
-            Live Allocation
+            {cardLabel}
           </p>
           <span className="rounded-pill border border-meridian-border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary">
             3 strategies
@@ -529,6 +545,7 @@ export default function DashboardPage() {
           idleMeth={vault.idleMeth}
           totalAssets={vault.totalAssets}
           loading={vault.isLoading}
+          latestDecision={latestDecision}
         />
         <KeeperStatusCard
           nextRebalanceIn={nextRebalanceIn}
