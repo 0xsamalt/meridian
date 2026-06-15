@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useReadContract, usePublicClient } from 'wagmi'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useReadContract, useReadContracts } from 'wagmi'
 import { REGISTRY_ADDRESS, registryAbi } from '@/lib/contracts'
 import { mantleSepolia } from '@/lib/chains'
 
@@ -77,8 +77,7 @@ async function fetchIpfsDoc(cid: string): Promise<ReasoningDoc | null> {
 }
 
 export function useDecisions(): { decisions: Decision[]; isLoading: boolean } {
-  const publicClient = usePublicClient({ chainId: mantleSepolia.id })
-
+  // Step 1: read total decision count
   const { data: countData, isLoading: countLoading } = useReadContract({
     address: REGISTRY_ADDRESS,
     abi: registryAbi,
@@ -89,53 +88,63 @@ export function useDecisions(): { decisions: Decision[]; isLoading: boolean } {
 
   const count = Number(countData ?? 0n)
 
+  // Step 2: batch-read all decision structs (avoids usePublicClient which can return undefined)
+  const contracts = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => ({
+        address: REGISTRY_ADDRESS as `0x${string}`,
+        abi: registryAbi,
+        functionName: 'getDecision' as const,
+        args: [BigInt(i)] as [bigint],
+        chainId: mantleSepolia.id,
+      })),
+    [count],
+  )
+
+  const { data: rawDecisions, isLoading: decisionsLoading } = useReadContracts({
+    contracts,
+    query: { enabled: count > 0, refetchInterval: REFETCH_MS },
+  })
+
+  // Persist IPFS docs across refetches so we don't re-fetch on every 30s poll
+  const ipfsCacheRef = useRef<Map<string, ReasoningDoc | null>>(new Map())
+
   const [decisions, setDecisions] = useState<Decision[]>([])
-  const [chainLoading, setChainLoading] = useState(false)
 
   useEffect(() => {
-    if (countLoading || count === 0 || !publicClient) return
+    if (countLoading || decisionsLoading || !rawDecisions) return
 
+    const ipfsCache = ipfsCacheRef.current
     let cancelled = false
-    setChainLoading(true)
 
-    async function load() {
-      // Read all decision structs in parallel
-      const indices = Array.from({ length: count }, (_, i) => i)
-      const structs = await Promise.all(
-        indices.map((i) =>
-          publicClient!.readContract({
-            address: REGISTRY_ADDRESS,
-            abi: registryAbi,
-            functionName: 'getDecision',
-            args: [BigInt(i)],
-          }).then((r) => r as DecisionStruct)
-        )
-      )
-
-      if (cancelled) return
-
-      // Build initial decisions without IPFS docs, newest first
-      const initial: Decision[] = structs
-        .map((s, i) => ({
+    const initial: Decision[] = rawDecisions
+      .map((r, i) => {
+        const s = r.result as unknown as DecisionStruct | undefined
+        if (!s) return null
+        const hasCached = ipfsCache.has(s.cid)
+        const cachedDoc = ipfsCache.get(s.cid) ?? null
+        return {
           index: i,
           timestamp: Number(s.timestamp),
           reasoningHash: s.reasoningHash,
           cid: s.cid,
           perfDeltaBps: Number(s.perfDeltaBps),
           totalAssets: s.totalAssets,
-          reasoning: null,
-          ipfsLoading: !!s.cid,
-          ipfsError: false,
-        }))
-        .reverse()
+          reasoning: hasCached ? cachedDoc : null,
+          ipfsLoading: !hasCached && !!s.cid,
+          ipfsError: hasCached && cachedDoc === null && !!s.cid,
+        }
+      })
+      .filter((d): d is Decision => d !== null)
+      .reverse()
 
-      setDecisions(initial)
-      setChainLoading(false)
+    setDecisions(initial)
 
-      // Fetch IPFS blobs one by one, updating state as each arrives
-      for (const d of initial) {
-        if (cancelled || !d.cid) continue
-        const doc = await fetchIpfsDoc(d.cid)
+    // Fetch IPFS blobs for any decision not yet cached, updating state as each arrives
+    for (const d of initial) {
+      if (!d.cid || ipfsCache.has(d.cid)) continue
+      fetchIpfsDoc(d.cid).then((doc) => {
+        ipfsCache.set(d.cid, doc) // cache before the cancelled check so refetches skip it
         if (cancelled) return
         setDecisions((prev) =>
           prev.map((p) =>
@@ -144,12 +153,11 @@ export function useDecisions(): { decisions: Decision[]; isLoading: boolean } {
               : p
           )
         )
-      }
+      })
     }
 
-    load().catch(() => setChainLoading(false))
     return () => { cancelled = true }
-  }, [count, countLoading, publicClient])
+  }, [rawDecisions, countLoading, decisionsLoading])
 
-  return { decisions, isLoading: countLoading || chainLoading }
+  return { decisions, isLoading: countLoading || (count > 0 && decisionsLoading) }
 }
