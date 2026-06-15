@@ -1,36 +1,29 @@
 import { z } from 'zod'
 import { env } from '../config.js'
 
-// Mantle mainnet token addresses — Nansen tracks chain-level holder behaviour,
-// not per-deployment contracts. Query mainnet addresses regardless of which
-// chain the vault is deployed on (testnet/mainnet).
-export const NANSEN_TOKENS = [
-  '0xcDA86A272531e8640cD7F1a92c01839711B90bb0', // mETH mainnet
-  '0xdEAddEaDdeadDEadDEADDEAddEADDEAddead1111', // WETH mainnet
-  '0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9', // USDC mainnet
-]
+// Mantle mainnet token symbols — Nansen tracks chain-level holder behaviour.
+// We filter the response by these symbols (case-insensitive match on token_symbol).
+const TARGET_SYMBOLS = new Set(['meth', 'weth', 'usdc', 'mnt'])
 
-// Maps lowercase address → canonical signal key (symbol)
-const ADDRESS_TO_SYMBOL: Record<string, string> = {
-  '0xcda86a272531e8640cd7f1a92c01839711b90bb0': 'mETH',
-  '0xdeaddeaddeaddeaddeaddeaddeaddeaddead1111': 'WETH',
-  '0x09bc4e0d864854c6afb6eb9a9cdf58ac190d0df9': 'USDC',
+// Canonical output keys
+const SYMBOL_MAP: Record<string, string> = {
+  meth: 'mETH',
+  weth: 'WETH',
+  usdc: 'USDC',
+  mnt: 'MNT',
 }
 
 const NansenItemSchema = z.object({
-  tokenAddress: z.string().optional(),
-  token_address: z.string().optional(),
-  netflowUsd: z.number().optional(),
-  netflow_usd: z.number().optional(),
-  netflow: z.number().optional(),
+  token_symbol: z.string().optional(),
+  net_flow_24h_usd: z.number().optional(),
 })
 
 const NansenResponseSchema = z
   .object({
-    result: z.array(NansenItemSchema).optional(),
     data: z.array(NansenItemSchema).optional(),
+    result: z.array(NansenItemSchema).optional(),
   })
-  .transform(r => r.result ?? r.data ?? [])
+  .transform(r => r.data ?? r.result ?? [])
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController()
@@ -43,20 +36,20 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
 }
 
 /**
- * Fetch 24h smart-money netflows from Nansen for the given token addresses.
+ * Fetch 24h smart-money netflows from Nansen for Mantle chain tokens.
  * Returns Record<symbol, netflowUsd>.
  * Throws on network error, non-200, or schema mismatch — caller handles stale.
  */
-export async function nansenNetflows(tokens: string[]): Promise<Record<string, number>> {
+export async function nansenNetflows(_tokens: string[]): Promise<Record<string, number>> {
   const res = await fetchWithTimeout(
-    'https://api.nansen.ai/api/v1/smart-money/netflows',
+    'https://api.nansen.ai/api/v1/smart-money/netflow',
     {
       method: 'POST',
       headers: {
         apikey: env.NANSEN_API_KEY,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ chain: 'mantle', tokenAddresses: tokens, timeframe: '1d' }),
+      body: JSON.stringify({ chains: ['mantle'] }),
     },
     8_000,
   )
@@ -70,10 +63,11 @@ export async function nansenNetflows(tokens: string[]): Promise<Record<string, n
 
   const result: Record<string, number> = {}
   for (const item of items) {
-    const addr = (item.tokenAddress ?? item.token_address ?? '').toLowerCase()
-    const symbol = ADDRESS_TO_SYMBOL[addr]
-    if (symbol === undefined) continue
-    result[symbol] = item.netflowUsd ?? item.netflow_usd ?? item.netflow ?? 0
+    const sym = (item.token_symbol ?? '').toLowerCase()
+    if (!TARGET_SYMBOLS.has(sym)) continue
+    const canonical = SYMBOL_MAP[sym]
+    if (canonical === undefined) continue
+    result[canonical] = item.net_flow_24h_usd ?? 0
   }
 
   return result

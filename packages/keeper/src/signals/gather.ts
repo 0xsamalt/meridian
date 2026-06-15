@@ -1,5 +1,5 @@
 import { SignalCache, MAX_CACHE_AGE } from './cache.js'
-import { nansenNetflows, NANSEN_TOKENS } from './nansen.js'
+import { nansenNetflows } from './nansen.js'
 import { elfaSentiment, ELFA_SYMBOLS } from './elfa.js'
 import type { Signals } from '../engine/types.js'
 
@@ -33,7 +33,7 @@ export async function gatherSignals(caches: GatherCaches): Promise<{
   caches: GatherCaches
 }> {
   const [nansenResult, elfaResult] = await Promise.all([
-    safeFetch(() => nansenNetflows(NANSEN_TOKENS)),
+    safeFetch(() => nansenNetflows([])),
     safeFetch(() => elfaSentiment(ELFA_SYMBOLS)),
   ])
 
