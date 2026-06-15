@@ -68,40 +68,40 @@ export default function DepositPage() {
 
   const { data: totalAssets, isLoading: taLoading, refetch: refetchTotalAssets } = useReadContract({
     address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'totalAssets',
-    query: { refetchInterval: REFETCH_MS },
+    chainId: 5003, query: { refetchInterval: REFETCH_MS },
   })
   const { data: totalSupply, refetch: refetchTotalSupply } = useReadContract({
     address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'totalSupply',
-    query: { refetchInterval: REFETCH_MS },
+    chainId: 5003, query: { refetchInterval: REFETCH_MS },
   })
   const { data: lastRebalance } = useReadContract({
     address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'lastRebalance',
-    query: { refetchInterval: REFETCH_MS },
+    chainId: 5003, query: { refetchInterval: REFETCH_MS },
   })
 
   const { data: methBalance, refetch: refetchMethBalance } = useReadContract({
     address: METH_ADDRESS, abi: erc20Abi, functionName: 'balanceOf',
-    args: [address as Address],
+    args: [address as Address], chainId: 5003,
     query: { enabled: isConnected && !!address, refetchInterval: REFETCH_MS },
   })
   const { data: vaultShares, refetch: refetchVaultShares } = useReadContract({
     address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'balanceOf',
-    args: [address as Address],
+    args: [address as Address], chainId: 5003,
     query: { enabled: isConnected && !!address, refetchInterval: REFETCH_MS },
   })
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: METH_ADDRESS, abi: erc20Abi, functionName: 'allowance',
-    args: [address as Address, VAULT_ADDRESS],
+    args: [address as Address, VAULT_ADDRESS], chainId: 5003,
     query: { enabled: isConnected && !!address, refetchInterval: 5_000 },
   })
   const { data: sharesPreview } = useReadContract({
     address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'previewDeposit',
-    args: [depositWei],
+    args: [depositWei], chainId: 5003,
     query: { enabled: depositWei > 0n },
   })
   const { data: assetsPreview } = useReadContract({
     address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'previewRedeem',
-    args: [withdrawWei],
+    args: [withdrawWei], chainId: 5003,
     query: { enabled: withdrawWei > 0n },
   })
 

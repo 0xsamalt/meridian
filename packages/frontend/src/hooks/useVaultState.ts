@@ -40,22 +40,22 @@ const REFETCH_MS = 15_000
 export function useVaultState(): VaultState {
   const { data, isLoading } = useReadContracts({
     contracts: [
-      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'totalAssets' },
-      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'totalSupply' },
-      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'lastRebalance' },
-      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'cooldown' },
+      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'totalAssets', chainId: 5003 },
+      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'totalSupply', chainId: 5003 },
+      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'lastRebalance', chainId: 5003 },
+      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'cooldown', chainId: 5003 },
       // per-strategy caps
-      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'maxAllocationBps', args: [CMETH_STRATEGY] },
-      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'maxAllocationBps', args: [AAVE_STRATEGY] },
-      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'maxAllocationBps', args: [USDY_STRATEGY] },
+      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'maxAllocationBps', args: [CMETH_STRATEGY], chainId: 5003 },
+      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'maxAllocationBps', args: [AAVE_STRATEGY], chainId: 5003 },
+      { address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'maxAllocationBps', args: [USDY_STRATEGY], chainId: 5003 },
       // per-strategy balances
-      { address: CMETH_STRATEGY, abi: strategyAbi, functionName: 'getBalance' },
-      { address: AAVE_STRATEGY,  abi: strategyAbi, functionName: 'getBalance' },
-      { address: USDY_STRATEGY,  abi: strategyAbi, functionName: 'getBalance' },
+      { address: CMETH_STRATEGY, abi: strategyAbi, functionName: 'getBalance', chainId: 5003 },
+      { address: AAVE_STRATEGY,  abi: strategyAbi, functionName: 'getBalance', chainId: 5003 },
+      { address: USDY_STRATEGY,  abi: strategyAbi, functionName: 'getBalance', chainId: 5003 },
       // per-strategy APY
-      { address: CMETH_STRATEGY, abi: strategyAbi, functionName: 'getCurrentAPY' },
-      { address: AAVE_STRATEGY,  abi: strategyAbi, functionName: 'getCurrentAPY' },
-      { address: USDY_STRATEGY,  abi: strategyAbi, functionName: 'getCurrentAPY' },
+      { address: CMETH_STRATEGY, abi: strategyAbi, functionName: 'getCurrentAPY', chainId: 5003 },
+      { address: AAVE_STRATEGY,  abi: strategyAbi, functionName: 'getCurrentAPY', chainId: 5003 },
+      { address: USDY_STRATEGY,  abi: strategyAbi, functionName: 'getCurrentAPY', chainId: 5003 },
     ],
     query: { refetchInterval: REFETCH_MS },
   })

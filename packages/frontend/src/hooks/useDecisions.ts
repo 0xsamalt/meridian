@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useReadContract, usePublicClient } from 'wagmi'
 import { REGISTRY_ADDRESS, registryAbi } from '@/lib/contracts'
+import { mantleSepolia } from '@/lib/chains'
 
 // Matches the shape produced by keeper/src/reasoning/build.ts exactly
 export interface ReasoningDoc {
@@ -76,12 +77,13 @@ async function fetchIpfsDoc(cid: string): Promise<ReasoningDoc | null> {
 }
 
 export function useDecisions(): { decisions: Decision[]; isLoading: boolean } {
-  const publicClient = usePublicClient()
+  const publicClient = usePublicClient({ chainId: mantleSepolia.id })
 
   const { data: countData, isLoading: countLoading } = useReadContract({
     address: REGISTRY_ADDRESS,
     abi: registryAbi,
     functionName: 'decisionCount',
+    chainId: mantleSepolia.id,
     query: { refetchInterval: REFETCH_MS },
   })
 
