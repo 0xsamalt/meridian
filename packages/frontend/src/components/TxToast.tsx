@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useWaitForTransactionReceipt } from 'wagmi'
-import { CheckCircle2, ExternalLink, Loader2, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, ExternalLink, Loader2, X } from 'lucide-react'
 import { EXPLORER } from '@/lib/contracts'
 import { useTxToast } from '@/contexts/TxToastContext'
 
@@ -56,13 +56,41 @@ function Inner({ hash }: { hash: `0x${string}` }) {
   )
 }
 
-export function TxToast() {
-  const { tx } = useTxToast()
-  if (!tx) return null
+function ErrorInner({ msg }: { msg: string }) {
+  const { dismissErr } = useTxToast()
+
+  useEffect(() => {
+    const id = setTimeout(dismissErr, 6_000)
+    return () => clearTimeout(id)
+  }, [dismissErr])
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-72">
-      <Inner hash={tx.hash} />
+    <div
+      role="alert"
+      className="flex items-start gap-3 rounded-card border border-red-500/30 bg-meridian-surface px-4 py-3 shadow-xl"
+    >
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+      <p className="min-w-0 flex-1 text-xs font-medium text-meridian-text-primary">{msg}</p>
+      <button
+        type="button"
+        aria-label="Dismiss"
+        onClick={dismissErr}
+        className="shrink-0 rounded p-0.5 text-meridian-text-tertiary transition-colors hover:text-meridian-text-primary"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
+
+export function TxToast() {
+  const { tx, err } = useTxToast()
+  if (!tx && !err) return null
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 w-72 space-y-2">
+      {err && <ErrorInner msg={err} />}
+      {tx && <Inner hash={tx.hash} />}
     </div>
   )
 }

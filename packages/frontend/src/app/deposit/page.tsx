@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   useAccount,
+  useChainId,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from 'wagmi'
+import { useQueryClient } from '@tanstack/react-query'
 import { parseUnits, formatUnits, type Address } from 'viem'
 import { ConnectKitButton } from 'connectkit'
 import { ShieldCheck, Loader2 } from 'lucide-react'
-import { VAULT_ADDRESS, METH_ADDRESS, vaultAbi, erc20Abi, EXPLORER } from '@/lib/contracts'
+import { VAULT_ADDRESS, METH_ADDRESS, vaultAbi, erc20Abi, mockErc20Abi, EXPLORER } from '@/lib/contracts'
 import { useTxToast } from '@/contexts/TxToastContext'
 import { fmt, fmtShares } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -50,7 +52,9 @@ function StatMini({ label, value, loading }: { label: string; value: string; loa
 
 export default function DepositPage() {
   const { address, isConnected } = useAccount()
-  const { pushTx } = useTxToast()
+  const chainId = useChainId()
+  const { pushTx, pushError } = useTxToast()
+  const queryClient = useQueryClient()
 
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit')
   const [depositAmt, setDepositAmt] = useState('')
@@ -62,11 +66,11 @@ export default function DepositPage() {
 
   // ── Chain reads ─────────────────────────────────────────────────────────────
 
-  const { data: totalAssets, isLoading: taLoading } = useReadContract({
+  const { data: totalAssets, isLoading: taLoading, refetch: refetchTotalAssets } = useReadContract({
     address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'totalAssets',
     query: { refetchInterval: REFETCH_MS },
   })
-  const { data: totalSupply } = useReadContract({
+  const { data: totalSupply, refetch: refetchTotalSupply } = useReadContract({
     address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'totalSupply',
     query: { refetchInterval: REFETCH_MS },
   })
@@ -75,12 +79,12 @@ export default function DepositPage() {
     query: { refetchInterval: REFETCH_MS },
   })
 
-  const { data: methBalance } = useReadContract({
+  const { data: methBalance, refetch: refetchMethBalance } = useReadContract({
     address: METH_ADDRESS, abi: erc20Abi, functionName: 'balanceOf',
     args: [address as Address],
     query: { enabled: isConnected && !!address, refetchInterval: REFETCH_MS },
   })
-  const { data: vaultShares } = useReadContract({
+  const { data: vaultShares, refetch: refetchVaultShares } = useReadContract({
     address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'balanceOf',
     args: [address as Address],
     query: { enabled: isConnected && !!address, refetchInterval: REFETCH_MS },
@@ -109,7 +113,10 @@ export default function DepositPage() {
     return (vaultShares * totalAssets) / totalSupply
   }, [vaultShares, totalAssets, totalSupply])
 
-  const needsApproval = !allowance || allowance < depositWei
+  const wrongChain    = isConnected && chainId !== 5003
+  const needsApproval = depositWei > 0n && (!allowance || allowance < depositWei)
+  // approveConfirmed: user has approved but hasn't deposited yet
+  const approveConfirmed = depositWei > 0n && !!allowance && allowance >= depositWei
 
   const lastRebalanceStr = lastRebalance
     ? new Date(Number(lastRebalance) * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -121,43 +128,116 @@ export default function DepositPage() {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: pendingHash })
   const busy = isPending || isConfirming
 
+  // Immediately refresh all balances + invalidate dashboard cache on confirmation
+  useEffect(() => {
+    if (!isConfirmed) return
+    void refetchTotalAssets()
+    void refetchTotalSupply()
+    void refetchMethBalance()
+    void refetchVaultShares()
+    void refetchAllowance()
+    // Invalidate all wagmi reads so the dashboard hook re-fetches too
+    queryClient.invalidateQueries()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConfirmed])
+
+  function extractErrMsg(err: unknown): string {
+    if (err instanceof Error) {
+      if (err.message.includes('User rejected')) return 'Transaction rejected'
+      if (err.message.includes('insufficient funds')) return 'Insufficient funds for gas'
+      return err.message.slice(0, 80)
+    }
+    return 'Transaction failed'
+  }
+
+  async function faucet() {
+    if (!address) return
+    try {
+      const hash = await writeContractAsync({
+        address: METH_ADDRESS, abi: mockErc20Abi, functionName: 'mint',
+        args: [address, parseUnits('10', 18)],
+      })
+      setPendingHash(hash)
+      pushTx(hash)
+    } catch (err) {
+      pushError(extractErrMsg(err))
+    }
+  }
+
   async function approve() {
     if (!address) return
-    const hash = await writeContractAsync({
-      address: METH_ADDRESS, abi: erc20Abi, functionName: 'approve',
-      args: [VAULT_ADDRESS, depositWei],
-    })
-    setPendingHash(hash)
-    pushTx(hash)
-    await refetchAllowance()
+    try {
+      const hash = await writeContractAsync({
+        address: METH_ADDRESS, abi: erc20Abi, functionName: 'approve',
+        args: [VAULT_ADDRESS, depositWei],
+      })
+      setPendingHash(hash)
+      pushTx(hash)
+      // refetchAllowance is handled by the isConfirmed effect after the tx confirms
+    } catch (err) {
+      pushError(extractErrMsg(err))
+    }
   }
 
   async function deposit() {
     if (!address) return
-    const hash = await writeContractAsync({
-      address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'deposit',
-      args: [depositWei, address],
-    })
-    setPendingHash(hash)
-    pushTx(hash)
-    setDepositAmt('')
+    try {
+      const hash = await writeContractAsync({
+        address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'deposit',
+        args: [depositWei, address],
+      })
+      setPendingHash(hash)
+      pushTx(hash)
+      setDepositAmt('')
+    } catch (err) {
+      pushError(extractErrMsg(err))
+    }
   }
 
   async function redeem() {
     if (!address) return
-    const hash = await writeContractAsync({
-      address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'redeem',
-      args: [withdrawWei, address, address],
-    })
-    setPendingHash(hash)
-    pushTx(hash)
-    setWithdrawAmt('')
+    try {
+      const hash = await writeContractAsync({
+        address: VAULT_ADDRESS, abi: vaultAbi, functionName: 'redeem',
+        args: [withdrawWei, address, address],
+      })
+      setPendingHash(hash)
+      pushTx(hash)
+      setWithdrawAmt('')
+    } catch (err) {
+      pushError(extractErrMsg(err))
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="mx-auto max-w-lg space-y-4 px-6 py-8">
+      {wrongChain && (
+        <div className="rounded-card border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+          Switch to <strong>Mantle Sepolia</strong> (chain 5003) to deposit.
+        </div>
+      )}
+
+      {isConnected && !wrongChain && methBalance !== undefined && methBalance < parseUnits('0.1', 18) && (
+        <div className="rounded-card border border-meridian-blue/20 bg-meridian-blue/5 px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs text-meridian-text-secondary">
+              You need testnet WETH to deposit. Mint 10 free tokens from the faucet.
+            </p>
+            <Button
+              onClick={faucet}
+              disabled={busy}
+              variant="outline"
+              className="shrink-0 border-meridian-blue/40 text-meridian-blue hover:bg-meridian-blue/10"
+            >
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Get 10 test WETH
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Vault card */}
       <div className="rounded-card border border-meridian-border bg-meridian-surface">
 
@@ -230,7 +310,7 @@ export default function DepositPage() {
                   <button
                     type="button"
                     className="transition-colors hover:text-meridian-text-primary"
-                    onClick={() => methBalance && setDepositAmt(formatUnits(methBalance, 18))}
+                    onClick={() => { if (methBalance !== undefined) setDepositAmt(formatUnits(methBalance, 18)) }}
                   >
                     Balance: <span className="tabular-nums">{fmt(methBalance)}</span> mETH
                   </button>
@@ -247,7 +327,7 @@ export default function DepositPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => methBalance && setDepositAmt(formatUnits(methBalance, 18))}
+                    onClick={() => { if (methBalance !== undefined) setDepositAmt(formatUnits(methBalance, 18)) }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-pill border border-meridian-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary transition-colors hover:border-meridian-border-hover hover:text-meridian-text-primary"
                   >
                     MAX
@@ -268,22 +348,55 @@ export default function DepositPage() {
                     </Button>
                   )}
                 </ConnectKitButton.Custom>
-              ) : needsApproval ? (
-                <Button
-                  onClick={approve}
-                  disabled={depositWei === 0n || busy}
-                  className="w-full"
-                >
-                  {busy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Approving…</> : 'Approve mETH'}
-                </Button>
               ) : (
-                <Button
-                  onClick={deposit}
-                  disabled={depositWei === 0n || !methBalance || depositWei > methBalance || busy}
-                  className="w-full"
-                >
-                  {busy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Depositing…</> : 'Deposit'}
-                </Button>
+                <div className="space-y-2">
+                  {/* Step indicators */}
+                  {depositWei > 0n && (
+                    <div className="flex items-center gap-2 pb-1 font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary">
+                      <span className={approveConfirmed ? 'text-meridian-success' : needsApproval ? 'text-meridian-blue' : 'text-meridian-text-tertiary'}>
+                        {approveConfirmed ? '✓ Step 1: Approved' : 'Step 1: Approve'}
+                      </span>
+                      <span>→</span>
+                      <span className={approveConfirmed ? 'text-meridian-blue' : 'text-meridian-text-tertiary'}>
+                        Step 2: Deposit
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Approval confirmed banner */}
+                  {approveConfirmed && (
+                    <div className="rounded-md border border-meridian-success/30 bg-meridian-success/10 px-3 py-2 text-xs text-meridian-success">
+                      Approval confirmed — click <strong>Deposit</strong> below to complete.
+                    </div>
+                  )}
+
+                  {needsApproval ? (
+                    <Button
+                      onClick={approve}
+                      disabled={depositWei === 0n || busy}
+                      className="w-full"
+                    >
+                      {busy
+                        ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Approving…</>
+                        : 'Step 1 — Approve mETH'}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        onClick={deposit}
+                        disabled={depositWei === 0n || methBalance === undefined || depositWei > methBalance || busy}
+                        className="w-full"
+                      >
+                        {busy
+                          ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Depositing…</>
+                          : 'Step 2 — Deposit'}
+                      </Button>
+                      {methBalance !== undefined && depositWei > 0n && depositWei > methBalance && (
+                        <p className="text-right text-xs text-red-400">Insufficient balance</p>
+                      )}
+                    </>
+                  )}
+                </div>
               )}
 
             </div>
@@ -298,7 +411,7 @@ export default function DepositPage() {
                   <button
                     type="button"
                     className="transition-colors hover:text-meridian-text-primary"
-                    onClick={() => vaultShares && setWithdrawAmt(formatUnits(vaultShares, 24))}
+                    onClick={() => { if (vaultShares !== undefined) setWithdrawAmt(formatUnits(vaultShares, 24)) }}
                   >
                     Balance: <span className="tabular-nums">{fmtShares(vaultShares)}</span> mvmETH
                     {sharesVal > 0n && (
@@ -320,7 +433,7 @@ export default function DepositPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => vaultShares && setWithdrawAmt(formatUnits(vaultShares, 24))}
+                    onClick={() => { if (vaultShares !== undefined) setWithdrawAmt(formatUnits(vaultShares, 24)) }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-pill border border-meridian-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-meridian-text-tertiary transition-colors hover:border-meridian-border-hover hover:text-meridian-text-primary"
                   >
                     MAX
@@ -344,7 +457,7 @@ export default function DepositPage() {
               ) : (
                 <Button
                   onClick={redeem}
-                  disabled={withdrawWei === 0n || !vaultShares || withdrawWei > vaultShares || busy}
+                  disabled={withdrawWei === 0n || vaultShares === undefined || withdrawWei > vaultShares || busy}
                   className="w-full"
                 >
                   {busy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Redeeming…</> : 'Redeem'}

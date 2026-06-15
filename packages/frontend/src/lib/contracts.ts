@@ -1,10 +1,11 @@
 // Mantle Sepolia — chain 5003
-export const VAULT_ADDRESS     = '0x2a339711221B33f9e5Ccd2e3811D3d00Eba020A7' as const
+// METH_ADDRESS points to MockWETH — a public-mint faucet token used as the vault asset on testnet
+export const VAULT_ADDRESS     = '0x94fB1E81b912e11fD2718e261EA39810C80c7471' as const
 export const REGISTRY_ADDRESS  = '0x27796e411769ebf9b365e8534bae3a03c5588cad' as const
-export const METH_ADDRESS      = '0x9EF6f9160Ba00B6621e5CB3217BB8b54a92B2828' as const
-export const CMETH_STRATEGY    = '0x87Af08833081B09222695133017d25c06eFAa12E' as const
-export const AAVE_STRATEGY     = '0x22923419faBE7853b3E4fE4fBE2C90EDc21DA090' as const
-export const USDY_STRATEGY     = '0x697b88a6BF3Df8D038b5685833f62646b1F1980a' as const
+export const METH_ADDRESS      = '0x849971BAB164D6B8cD7B0916F104c720d5570d19' as const
+export const CMETH_STRATEGY    = '0x3a2aa17Fae857007DB1ab8cAEc160C1bEfB9Dca7' as const
+export const AAVE_STRATEGY     = '0x441EEAb712DDD88b61642ace0Ae237525512197a' as const
+export const USDY_STRATEGY     = '0x95389826649dBd891e2aB6a0813EB3336c41345A' as const
 
 export const STRATEGY_META = {
   [CMETH_STRATEGY]: { key: 'cmeth', label: 'cmETH Restaking', color: '#3B82F6' },
@@ -22,6 +23,12 @@ export const erc20Abi = [
   { name: 'approve',    type: 'function', stateMutability: 'nonpayable',   inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ type: 'bool' }] },
   { name: 'decimals',   type: 'function', stateMutability: 'view',        inputs: [],                                                                         outputs: [{ type: 'uint8' }] },
   { name: 'symbol',     type: 'function', stateMutability: 'view',        inputs: [],                                                                         outputs: [{ type: 'string' }] },
+] as const
+
+// MockWETH (and all mock tokens) inherit MockERC20 which exposes a public mint
+export const mockErc20Abi = [
+  ...erc20Abi,
+  { name: 'mint', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [] },
 ] as const
 
 export const vaultAbi = [

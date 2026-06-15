@@ -1,582 +1,248 @@
-# Meridian — Frontend Design System
+---
+version: "meridian-terminal-2026-06-14"
+name: "Meridian Design System"
+description: "Terminal-native dark product UI for Meridian — AI-managed ERC-4626 yield vault on Mantle. Precision-engineered, data-first, low-decoration. References: EigenLayer, Hyperliquid."
+register: product
+colors:
+  primary: "#3B82F6"
+  accent: "#93C5FD"
+  background: "#0A0E14"
+  surface: "#12161F"
+  surface-raised: "#1A1F2B"
+  border: "rgba(255,255,255,0.08)"
+  border-hover: "rgba(255,255,255,0.16)"
+  text-primary: "#F5F7FA"
+  text-secondary: "#9CA3AF"
+  text-tertiary: "#6B7280"
+  success: "#34D399"
+  warning: "#FBBF24"
+  danger: "#F87171"
+typography:
+  display:
+    fontFamily: "Inter"
+    fontSize: "60px"
+    fontWeight: 600
+    lineHeight: "1.06"
+    letterSpacing: "-0.02em"
+  heading-lg:
+    fontFamily: "Inter"
+    fontSize: "24px"
+    fontWeight: 600
+    lineHeight: "1.3"
+  heading-md:
+    fontFamily: "Inter"
+    fontSize: "18px"
+    fontWeight: 600
+    lineHeight: "1.4"
+  body-md:
+    fontFamily: "Inter"
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: "1.6"
+  body-sm:
+    fontFamily: "Inter"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: "1.5"
+  label-mono:
+    fontFamily: "JetBrains Mono"
+    fontSize: "11px"
+    fontWeight: 500
+    lineHeight: "1.2"
+    letterSpacing: "0.06em"
+    textTransform: "uppercase"
+  data-lg:
+    fontFamily: "Inter"
+    fontSize: "40px"
+    fontWeight: 600
+    lineHeight: "1.1"
+  data-md:
+    fontFamily: "Inter"
+    fontSize: "24px"
+    fontWeight: 600
+    lineHeight: "1.2"
+spacing:
+  base: "8px"
+  gap-card: "16px"
+  card-padding: "20px"
+  section-padding-landing: "80px"
+rounded:
+  card: "16px"
+  control: "8px"
+  pill: "9999px"
+---
 
-**Direction: "Quiet Intelligence"**
-A dark institutional interface where every number earns its place and the AI surfaces
-insight without theatrics — the visual language of a trusted quant desk, not a
-trading floor.
+# Meridian Design System
+
+Terminal-native dark product UI. Design SERVES the vault. Data is the hero. Every visual decision should make the numbers and AI decisions clearer, not compete with them.
+
+**Reference aesthetic:** EigenLayer, Hyperliquid — precision-engineered, monospace data labels, low-glow dark surfaces, functional and serious.
+
+**Anti-references (never do):**
+- Generic shadcn/Tailwind template output
+- Neon/cyberpunk crypto glows or gradient borders
+- Centered h1 + blob + CTA SaaS hero template
+- Excessive particle effects or animations competing with content
 
 ---
 
-## The Design Problem
+## Colors
 
-Users are depositing real mETH. The design's job is to answer an unspoken question
-before the user even connects their wallet: *"Can I trust this?"*
+Dark mode only. No light mode variant.
 
-That answer comes from restraint, precision, and transparency — not from hype,
-gradients, or a big APY number in neon green.
-
-**Mood board (study these before writing a single line of CSS):**
-1. **Tesseract** (tesseract.fi) — gold standard for institutional DeFi vault UI
-2. **Gauntlet** (gauntlet.xyz) — how "AI for finance" positions as trusted advisor, not gimmick
-3. **Linear** (linear.app) — dark SaaS done right: Inter type, restrained accent, skeleton states
-
----
-
-## Visual Elements
-
-The rule: **every animated or 3D element must be connected to the product's meaning**.
-A spinning orb is decoration. Allocation bars that move when the AI rebalances
-*are* the product. Build semantic visuals first, decorative visuals last.
-
-### Priority 1 — Animated Allocation Bars + APY Counters *(build this first)*
-
-**Tool:** Framer Motion (`framer-motion`)
-**Placement:** Strategy cards on the Dashboard, and the summary allocation bar
-**What it does:** When the AI rebalances, the bar widths animate from old to new
-allocation using a spring curve. APY and TVL numbers count up on mount and
-update in real time.
-
-This is the single highest-impact visual. It directly shows the AI working —
-bars visibly shift after each rebalance. A static chart makes the AI invisible.
-
-```tsx
-// Animated allocation bar — width springs to new value on rebalance
-<motion.div
-  className="h-1.5 rounded-full"
-  style={{ background: strategyColor }}
-  initial={{ width: "0%" }}
-  animate={{ width: `${allocationPct}%` }}
-  transition={{ type: "spring", stiffness: 60, damping: 20 }}
-/>
-
-// Animated number counter (APY, TVL)
-// Recipe: buildui.com/recipes/animated-counter
-// The number smoothly increments rather than snapping to the new value.
-// Apply to: APY %, TVL in mETH, share price, earned yield ticker
-```
-
-Install: `npm install framer-motion`
-
----
-
-### Priority 2 — ShaderGradient Hero Background
-
-**Tool:** `@shadergradient/react`
-**Placement:** Full-bleed behind the hero section (Dashboard above the stats bar).
-Covers maybe 40vh. Fades to `#0A0D12` at the bottom.
-**What it does:** A WebGL animated gradient that creates an almost imperceptible
-slow dark drift — the background feels alive without demanding attention.
-Inspired by Morpho's "grain style" textural backgrounds.
-
-```tsx
-import { ShaderGradientCanvas, ShaderGradient } from "@shadergradient/react"
-
-// In your hero section:
-<div className="relative h-[40vh] overflow-hidden">
-  <ShaderGradientCanvas className="absolute inset-0">
-    <ShaderGradient
-      color1="#0A0D12"     // your exact bg color — baseline
-      color2="#0F2040"     // deep navy — barely-visible shift
-      color3="#12183A"     // indigo-black — subtle violet undertone
-      brightness={0.6}     // pull brightness down hard
-      grain={0.4}          // grain texture = Morpho aesthetic
-      type="waterPlane"    // slow horizontal drift, NOT a spinning orb
-      animate="on"
-      uSpeed={0.1}         // very slow — institutional, not playful
-      cDistance={32}
-      cPolarAngle={125}
-    />
-  </ShaderGradientCanvas>
-  {/* hero content sits on top */}
-</div>
-```
-
-**Fallback:** If WebGL is unavailable, the `#0A0D12` solid color shows through — 
-no broken experience.
-
-Install: `npm install @shadergradient/react`
-
----
-
-### Priority 3 — Decision Log Stagger Animation
-
-**Tool:** Framer Motion `AnimatePresence` + `staggerChildren`
-**Placement:** The `/decisions` page feed
-**What it does:** Each new decision entry slides in from the bottom with a 40ms
-stagger. When a new decision arrives live, the newest card briefly pulses its
-violet left-border. This makes the feed feel like a live intelligence stream,
-not a static table.
-
-```tsx
-<AnimatePresence>
-  {decisions.map((d, i) => (
-    <motion.div
-      key={d.index}
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: i * 0.04, duration: 0.3 }}
-    >
-      <DecisionCard decision={d} />
-    </motion.div>
-  ))}
-</AnimatePresence>
-```
-
----
-
-### Priority 4 — Subtle Particle Constellation (optional polish)
-
-**Tool:** React Three Fiber (`@react-three/fiber`) + `@react-three/drei`
-**Placement:** Behind the hero section, as a secondary background layer under
-the ShaderGradient or replacing it if you want more depth.
-**What it does:** ~4,000 small white points at opacity 0.18 drifting in a loose
-sphere formation. Reads as "neural network" or "constellation" — intelligence,
-not chaos.
-
-```tsx
-import { Canvas, useFrame } from "@react-three/fiber"
-import { Points, PointMaterial } from "@react-three/drei"
-import * as THREE from "three"
-import { useRef, useMemo } from "react"
-
-function ParticleField() {
-  const ref = useRef<THREE.Points>(null)
-
-  const positions = useMemo(() => {
-    const arr = new Float32Array(4000 * 3)
-    for (let i = 0; i < 4000; i++) {
-      const r = 2.5 + Math.random() * 1.5
-      const theta = Math.random() * Math.PI * 2
-      const phi = Math.acos(2 * Math.random() - 1)
-      arr[i * 3]     = r * Math.sin(phi) * Math.cos(theta)
-      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
-      arr[i * 3 + 2] = r * Math.cos(phi)
-    }
-    return arr
-  }, [])
-
-  useFrame((_, delta) => {
-    if (ref.current) ref.current.rotation.y += delta * 0.015
-  })
-
-  return (
-    <Points ref={ref}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-      </bufferGeometry>
-      <PointMaterial
-        size={0.006}
-        color="#F0F2F5"
-        opacity={0.18}
-        transparent
-        sizeAttenuation
-        depthWrite={false}
-      />
-    </Points>
-  )
-}
-
-// In your hero:
-const Scene = dynamic(
-  () => import("@react-three/fiber").then(m => { /* wrap */ }),
-  { ssr: false }
-)
-```
-
-Key constraints: `rotation.y += delta * 0.015` — imperceptibly slow. No glow,
-no connecting lines, no color, no bloom post-processing. The moment it starts
-to glow it becomes a crypto casino.
-
-Install: `npm install @react-three/fiber @react-three/drei three`
-
----
-
-### Spline — Use for One Thing Only (if at all)
-
-Spline (`@splinetool/react-spline`) adds 2–5MB and meaningful GPU overhead.
-If you use it, use it for exactly one element: a small decorative 3D mark in the
-header (e.g., an abstract geometric logo companion, not a background).
-
-Community scenes worth inspecting (open in Spline editor, check color + performance):
-- Abstract Shapes (CC0): `community.spline.design/file/035d65ab-4a23-4e0e-b291-897ea46f08f3`
-- Abstract Crypto Scene (CC0): `community.spline.design/file/1c406718-0bc2-4d6d-aec9-27f53279221a`
-
-Before using any community scene: open it in the Spline editor, recolor to the
-Meridian palette, confirm the scene polygon count is under 50K, then export as
-a static scene (not runtime). Load via `next/dynamic` with `ssr: false`.
-
-**When NOT to use Spline:** background fills, anything that covers significant
-viewport area, or any scene with particle emitters or neon glow materials.
-
----
-
-### The Casino Blacklist — Never Use These
-
-| Pattern | Why it kills trust |
-|---|---|
-| Spinning 3D ETH/token coin | Single most common DeFi casino signal |
-| Neon glow / bloom at high intensity | Every rug-pull protocol uses this |
-| Laser grid / synthwave floor | Web3 cliché, zero institutional credibility |
-| Particle explosions / orbital emitters | Gamification signal |
-| Plasma / kaleidoscope / fractal shaders | decorative chaos, no semantic meaning |
-| 3D extruded bar charts | Destroys data legibility, signals bad judgment |
-| Scrolling price ticker marquees | Exchange / trading app pattern |
-| Dark purple-to-pink gradient background | The NFT marketplace aesthetic |
-| Confetti on deposit success | This is a vault, not a slot machine |
-
----
-
-## Color Palette
-
-### Surfaces
-```
---color-bg:          #0A0D12   /* primary background — near-black with blue undertone, NOT pure black */
---color-surface:     #111620   /* card / panel background */
---color-surface-2:   #1A2030   /* elevated surface: modals, dropdowns, sidebar */
---color-border:      #222D40   /* dividers, card outlines */
---color-border-2:    #2A3550   /* focused / hover borders */
-```
-
-### Text
-```
---color-text:        #F0F2F5   /* primary — off-white, not pure white */
---color-text-2:      #8A95A8   /* secondary: labels, metadata */
---color-text-muted:  #505A6E   /* placeholder, disabled */
-```
-
-### Primary — Mantle Blue (interactive elements)
-```
---color-primary:     #3B82F6
---color-primary-hover: #2563EB
---color-primary-deep: #1D4ED8
-```
-
-### Yield Green (positive APY, gains, earned yield ONLY)
-```
---color-yield:       #10B981   /* emerald — trustworthy, NOT neon lime */
---color-yield-hover: #059669
---color-yield-bg:    #052e16   /* subtle green tint for positive stat backgrounds */
-```
-
-### AI Accent — Violet (used ONLY for AI decision log entries)
-```
---color-ai:          #7C3AED
---color-ai-hover:    #8B5CF6
---color-ai-bg:       #1e1030   /* left-border tint on decision cards */
-```
-
-### Semantic
-```
---color-error:       #EF4444
---color-warning:     #F59E0B
---color-neutral:     #6B7280
-```
-
-### Strategy Colors (allocation chart only)
-```
-cmETH strategy:      #3B82F6   /* blue */
-Aave strategy:       #10B981   /* green */
-USDY strategy:       #F59E0B   /* amber */
-Idle:                #374151   /* dark gray */
-```
-
-**Rules:**
-- These four strategy colors are reserved for the allocation bar/chart. Do not reuse them decoratively.
-- The AI violet `#7C3AED` appears only on AI decision log entries — left border accent + timestamp label. Nowhere else.
-- Do not introduce additional accent colors. Colorful interfaces feel like casinos.
-
----
+| Token | Value | Role |
+|-------|-------|------|
+| `meridian-bg` | `#0A0E14` | Page background |
+| `meridian-surface` | `#12161F` | Card / panel background |
+| `meridian-surface-raised` | `#1A1F2B` | Elevated surface, nested elements |
+| `meridian-border` | `rgba(255,255,255,0.08)` | All borders, dividers |
+| `meridian-border-hover` | `rgba(255,255,255,0.16)` | Hovered interactive card borders |
+| `meridian-blue` | `#3B82F6` | Primary actions, active nav, links |
+| `meridian-blue-dim` | `#1E3A6E` | Blue surface tint (very subtle) |
+| `meridian-blue-light` | `#93C5FD` | Accent, left ring of logo, light allocation |
+| `meridian-text-primary` | `#F5F7FA` | Primary content |
+| `meridian-text-secondary` | `#9CA3AF` | Labels, supporting text |
+| `meridian-text-tertiary` | `#6B7280` | Timestamps, metadata, placeholders |
+| `meridian-success` | `#34D399` | Positive delta, live signals |
+| `meridian-warning` | `#FBBF24` | Stale signals |
+| `meridian-danger` | `#F87171` | Negative delta, errors |
 
 ## Typography
 
-### Fonts
-```css
-/* Interface: Inter (tabular numerals enabled globally) */
-font-family: 'Inter', system-ui, -apple-system, sans-serif;
-font-feature-settings: "tnum";   /* tabular numbers — ALL numeric displays */
-
-/* Monospace: Geist Mono (addresses, tx hashes, CIDs) */
-font-family: 'Geist Mono', 'JetBrains Mono', monospace;
-```
+Two families only:
+- **Inter** — all UI text, headings, body, data numbers
+- **JetBrains Mono** — addresses, CIDs, tx hashes, technical labels, nav links, strategy keys
 
 ### Scale
-```
-Hero number (vault TVL, portfolio balance):  2.5rem / 700
-Section header:                              1.25rem / 600
-Card title / stat label:                     0.875rem / 500  (uppercase + 0.05em tracking)
-Body:                                        0.875rem / 400
-APY value:                                   1.5rem  / 600   (yield green)
-Small / metadata:                            0.75rem / 400   (text-2 color)
-Monospace (address, hash):                   0.75rem / 400   (Geist Mono)
-```
 
-### Number formatting rules
-- All financial numbers: tabular numerals, right-aligned in columns
-- mETH values: always 4 decimal places (`1.2345 mETH`)
-- Percentages: always 2 decimal places (`3.50%`)
-- USD estimates: 2 decimal places with comma separator (`$1,234.56`)
-- Large TVL: abbreviated with unit (`14.6M mETH`, not `14600000`)
-- Timestamps: relative for recent (`4h 23m ago`), absolute for old (`Jun 12, 2026 14:30`)
-
----
+| Role | Family | Size | Weight | Notes |
+|------|---------|------|--------|-------|
+| Display (landing hero) | Inter | 60px | 600 | `-0.02em` letter-spacing, tight leading 1.06 |
+| Heading LG (page titles) | Inter | 24px | 600 | |
+| Heading MD (card titles) | Inter | 18px | 600 | |
+| Body MD | Inter | 15px | 400 | Line-height 1.6, max 65ch |
+| Body SM | Inter | 13px | 400 | |
+| Label Mono | JetBrains Mono | 11px | 500 | Uppercase, 0.06em tracking — addresses, keys, nav |
+| Data LG (TVL) | Inter | 40px | 600 | Tabular nums |
+| Data MD (share price, stats) | Inter | 24px | 600 | Tabular nums |
 
 ## Layout
 
-### Page structure
-```
-┌─────────────────────────────────────────────────────────┐
-│  HEADER: Logo | Nav (Dashboard · Deposit · Decisions)    │
-│          right: ConnectWallet button                     │
-├──────────┬──────────────────────────────────────────────┤
-│ (optional│  PAGE CONTENT                                 │
-│  sidebar)│  - max-width: 1200px, centered, px-6          │
-│          │  - 24px gap between sections                  │
-└──────────┴──────────────────────────────────────────────┘
-```
+### Landing page sections
 
-### Card anatomy
-Every stat card follows the same internal hierarchy:
-```
-┌─────────────────────────────────┐
-│  LABEL (0.75rem, uppercase, muted)
-│
-│  VALUE  (dominant number — one per card, 1.5–2.5rem)
-│
-│  SUBTEXT (delta, source, timestamp — 0.75rem, muted)
-└─────────────────────────────────┘
-```
-One dominant number per card. No visual tie for importance. Padding: 20px.
-Border: 1px solid `--color-border`. Border-radius: 8px.
+1. **Hero** — full viewport, left-aligned, ambient SVG ring layer behind text
+2. **Stats bar** — `border-t border-b border-meridian-border`, 3 columns, no cards, just a strip
+3. **Feature bento** — mixed 2-col + 1-col + 1-col card grid
+4. **CTA strip** — full-width, centered, single action
 
-### Grid
-- Stats row: 3-column grid on desktop, 1-column on mobile
-- Strategy table: full-width, no horizontal scroll on desktop
-- Decision log: single-column feed
-
----
-
-## Component Specifications
-
-### Vault Stats Bar (top of Dashboard)
-Three cards side-by-side:
-
-| Card | Dominant number | Subtext |
-|---|---|---|
-| Total Value Locked | X.XXXX mETH | "≈ $X,XXX · updated 12s ago" |
-| Current APY | X.XX% | "7-day avg · AI-optimized" |
-| AI vs Passive Hold | +XX bps | "since inception · view log →" |
-
-The "AI vs Passive Hold" number uses `--color-yield` when positive, `--color-error`
-when negative. This is the headline proof-of-value metric for judges.
-
-### Strategy Allocation Bar
-A horizontal segmented bar, not a pie chart. Three colored segments + idle.
+### Dashboard bento grid
 
 ```
-cmETH ████████████████░░░░░░░░░░░░ 52%   Aave ████████░░░░ 28%   USDY █████░░░ 17%   Idle 3%
+[ TVL (2-col wide)              ] [ Share Price (1-col) ]
+[ Allocation (2-col)            ] [ Keeper Status (1-col) ]
+[ Keeper Activity Feed (3-col full width)                 ]
 ```
 
-Below the bar: a small table with columns:
-`Strategy | Balance (mETH) | APY | Allocation | Status`
+TVL card: `data-lg` (40px) number, very subtle radial gradient behind (`rgba(59,130,246,0.04) at bottom`).
+Keeper Status card: shows countdown in `font-mono text-[28px]`, active/paused state.
 
-All numbers right-aligned. APY column in `--color-yield`. Status badge:
-- `ACTIVE` — green pill
-- `DEPLOYING` — blue pill with spinner
-- `IDLE` — gray pill
+### App pages (deposit, decisions)
 
-### Last Rebalanced indicator
-Always visible near the allocation bar:
-```
-⟳  Last rebalanced  4h 23m ago   ·   Next window: 32m   ·   View tx →
-```
-Small text, `--color-text-2`. This answers "is this thing working?"
+Max content width: `1080px`. Card padding: `20px`. Gap: `16px`.
 
-### Yield Accrual Ticker
-On the deposit page, for connected users with a balance:
+## Components
+
+### Cards
 
 ```
-Earning now
-0.000042  mETH/hr
+background: meridian-surface (#12161F)
+border: 1px solid meridian-border (rgba(255,255,255,0.08))
+border-radius: 16px (card)
+padding: 20px
+shadow: none — separation via contrast + border only
 ```
 
-The number updates on each new block. Even tiny numbers growing upward are the
-most psychologically effective trust signal a yield product has.
-
-### AI Decision Log Card
-One card per `DecisionRecorded` event, newest first.
-
+**Interactive cards (landing feature bento):**
 ```
-┌─╔══════════════════════════════════════════════════════╗
-│ ║  [AI]  Jun 12 14:32 UTC  ·  NORMAL mode              ║  ← violet left border
-│ ║                                                       ║
-│ ║  Allocation change                                    ║
-│ ║  cmETH  45% → 52%  (+7%)   ▲                         ║
-│ ║  Aave   35% → 28%  (-7%)   ▼                         ║
-│ ║  USDY   17% → 17%  (—)                               ║
-│ ║                                                       ║
-│ ║  AI Reasoning                                         ║
-│ ║  "USDY sleeve retained at 17% on stable T-bill        ║
-│ ║   yield. cmETH favored: +$120k smart-money inflow     ║
-│ ║   (Nansen) and no swap/peg risk vs Aave. Aave         ║
-│ ║   trimmed: WETH borrow rates compressing margin."     ║
-│ ║                                                       ║
-│ ║  Performance: +47 bps vs passive hold                 ║
-│ ║                                                       ║
-│ ║  [IPFS ↗] bafybei...4cXA   [On-chain ↗] 0x8a3f...    ║
-└─╚══════════════════════════════════════════════════════╝
+hover: border → meridian-border-hover (rgba(255,255,255,0.16))
+hover: transform → translateY(-2px)
+transition: border-color 150ms ease-out, transform 200ms ease-out
 ```
 
-- Left border: 3px solid `--color-ai` (#7C3AED)
-- Background: `--color-surface` with a subtle `--color-ai-bg` tint
-- The IPFS and on-chain links are the transparency proof — make them visible
-- Skeleton state while IPFS blob fetches: pulsing gray blocks at the reasoning text position
+### Buttons
 
-### Connect Wallet Button
-- Disconnected: `Connect Wallet` — outlined button, `--color-primary` border + text
-- Connected: shows truncated address (`0x640C...7911`) + MNT balance, green dot
+| Variant | Style |
+|---------|-------|
+| Primary | `bg-meridian-blue text-white` rounded-control (8px), `hover:bg-[#2563EB]` |
+| Ghost | `border border-meridian-border text-meridian-text-secondary hover:border-meridian-border-hover hover:text-meridian-text-primary` |
+| Link | `text-meridian-blue hover:text-meridian-blue-light` |
 
-### Transaction States
-After any deposit/withdraw/approve:
-- Pending: spinning icon + "Waiting for confirmation..."
-- Success: checkmark + "Transaction confirmed" + Mantlescan link
-- Error: red X + specific error message (e.g., "Insufficient mETH balance")
-No confetti. No celebrations. A quiet confirmation is correct.
+### Navigation active state
 
----
+`border-b-2 border-meridian-blue text-meridian-text-primary`
+NOT a background pill. Never `bg-accent` or `bg-primary`.
 
-## Trust Architecture
+### Tabs (deposit page)
 
-These elements must appear above the fold — treat them as design features, not
-fine print or footer content.
+Active tab: `border-b-2 border-meridian-blue text-meridian-text-primary`
+Inactive: `text-meridian-text-secondary hover:text-meridian-text-primary`
+NO background fill on tab trigger.
 
-### Security bar (below the header or above the deposit form)
+### Allocation bars
+
+Height: `10px` (not 6px). Rounded full. Fill animates on mount: `transition-[width] duration-700 ease-out`.
+
+### Badges / pills
+
+`font-mono text-[11px] uppercase tracking-widest rounded-pill px-2 py-0.5`
+Borders only — no fill backgrounds on neutral badges.
+
+### Data display
+
+- All numbers: `font-variant-numeric: tabular-nums`
+- Addresses / CIDs: `font-mono bg-meridian-surface-raised px-2 py-0.5 rounded-md text-[11px]` — mono pill
+- Signal status dots: `●` unicode in `text-meridian-success` or `text-meridian-warning`
+
+## Motion
+
+**Duration scale:**
+- Micro (hover border, color): `150ms ease-out`
+- Standard (card lift, tab switch): `200ms ease-out`
+- Reveal (masked headline, bento stagger): `350-450ms cubic-bezier(0.16, 1, 0.3, 1)`
+- Data fill (allocation bars): `700ms ease-out`
+
+**Stagger:** 50-80ms between sibling cards.
+
+**Always provide `@media (prefers-reduced-motion: reduce)` alternative** — typically instant transition.
+
+**No bounce. No elastic. No spring physics.**
+
+### Landing hero ambient layer
+
+Two SVG circle rings (`cx/cy` offset for the dual-ring motif):
+- Left ring: `stroke: #93C5FD`, `opacity: 0.06`, slow clockwise rotation — `animation: ring-spin-slow 40s linear infinite`
+- Right ring: `stroke: #3B82F6`, `opacity: 0.06`, slow counter-clockwise — `animation: ring-spin-slow 55s linear infinite reverse`
+- Size: fill the viewport height roughly, positioned `absolute inset-0` behind content
+- Reduced motion: `animation: none`, rings render statically at same opacity
+
+## Score bars (Decisions page)
+
+Replace recharts `<BarChart>` with custom CSS:
+```tsx
+<div className="h-2 w-full rounded-full bg-meridian-surface-raised">
+  <div
+    className="h-full rounded-full transition-[width] duration-500"
+    style={{ width: `${normalizedScore}%`, background: STRATEGY_COLORS[key] }}
+  />
+</div>
 ```
-🛡 Audited   ·   Contracts verified on Mantlescan   ·   Non-custodial   ·   Max 70% per strategy
-```
-Small text, `--color-text-muted`. The constraints (cooldown, caps) are safety rails —
-display them as features.
+No library dependency. Consistent with allocation bar visual language.
 
-### Guard rail indicators (on the deposit / vault page)
-```
-Strategy caps:   cmETH max 60%   ·   Aave max 60%   ·   USDY max 50%
-Rebalance cooldown:  1h between rebalances
-Keeper powers:   Rebalance only — cannot withdraw funds
-```
-These limits signal disciplined design. They reduce fear.
+## Guardrails
 
-### Pre-wallet state
-Before a user connects their wallet, the Dashboard and Decisions pages should
-display live read-only data: vault TVL, current allocation, last decision, APY.
-Do not show a blank screen with only "Connect Wallet."
-The machine should be visibly working before any money is at stake.
-
----
-
-## What NOT to Build
-
-| Pattern | Why |
-|---|---|
-| Neon lime / yellow-green APY numbers | Casino signal. Use `#10B981` only. |
-| Animated gradient backgrounds / aurora blobs | Every low-trust protocol uses these. Meridian's background is flat `#0A0D12`. |
-| Unlabeled APY numbers | Always show timeframe ("7-day avg") and source. Naked yield numbers are a red flag. |
-| Confetti / success celebrations | Use a quiet checkmark. Confetti is for gaming apps. |
-| Multiple decorative accent colors | Three semantic colors maximum. Extra colors = visual noise. |
-| Pie chart for allocation | Horizontal segmented bar is more scannable and feels more controlled. |
-| "Powered by AI" marketing badge | Let the decision log speak. A live feed of verifiable AI decisions is the proof. |
-| Hamburger menu on desktop | Signals mobile-first afterthought. |
-| Bright white (#FFFFFF) backgrounds | Wrong audience. Dark is correct for crypto-native mETH depositors. |
-| Hiding the AI layer as a footnote | It's the product's differentiation — surface it through the decision log, not marketing copy. |
-
----
-
-## Page-by-Page Checklist
-
-### Dashboard (`/dashboard`)
-- [ ] Vault stats bar (TVL, APY, AI vs Passive Hold)
-- [ ] Strategy allocation bar (horizontal, 4 segments, labeled)
-- [ ] Per-strategy table (balance, APY, allocation%, status badge)
-- [ ] Last rebalanced / next window indicator
-- [ ] Recent rebalances list (last 5, with tx links)
-- [ ] Link to Decision Log ("View full AI reasoning →")
-- [ ] All data visible pre-wallet-connect
-
-### Deposit (`/deposit`)
-- [ ] Tab switcher: Deposit | Withdraw
-- [ ] mETH balance display (live)
-- [ ] mvmETH balance + current value in mETH
-- [ ] Share price (mETH per share)
-- [ ] Yield accrual ticker (when connected + balance > 0)
-- [ ] Approve → Deposit flow with clear state feedback
-- [ ] previewRedeem shows estimated mETH out before withdraw
-- [ ] Security bar above the form
-- [ ] Guard rail indicators
-
-### Decision Log (`/decisions`)
-- [ ] Page header with one-line explanation of transparency model
-- [ ] Decision cards, newest first, with violet left border
-- [ ] AI reasoning text (from IPFS)
-- [ ] Allocation delta table per card
-- [ ] perfDeltaBps (AI vs passive hold)
-- [ ] IPFS link + Mantlescan tx link on every card
-- [ ] Skeleton loading while IPFS blobs fetch
-- [ ] Empty state: "No decisions yet — keeper runs every hour"
-
----
-
-## shadcn/ui Component Map
-
-| UI element | shadcn component |
-|---|---|
-| Stat cards | `Card`, `CardHeader`, `CardContent` |
-| Strategy table | `Table`, `TableRow`, `TableCell` |
-| Status badges | `Badge` (variant: default/secondary/outline) |
-| Tab switcher | `Tabs`, `TabsList`, `TabsTrigger` |
-| Input fields | `Input` |
-| Buttons | `Button` (variant: default / outline / ghost) |
-| Loading states | `Skeleton` |
-| Toast notifications | `Sonner` (or `useToast`) |
-| Tooltips | `Tooltip` |
-| Decision card | `Card` with custom left-border via className |
-
-Override shadcn defaults with the palette above. The default shadcn theme will not
-match — replace all `--primary`, `--background`, `--card`, `--border` CSS vars in
-`globals.css` to match the palette at the top of this document.
-
----
-
-## Implementation Notes for Session 7
-
-1. **Install fonts early:**
-   ```bash
-   # In layout.tsx — use next/font
-   import { Inter } from 'next/font/google'
-   const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-   ```
-   Add `font-feature-settings: "tnum"` to `body` in `globals.css`.
-
-2. **Override shadcn CSS vars in `globals.css`:**
-   Replace `:root` and `.dark` blocks with the palette above. Do this before
-   building any components.
-
-3. **Recharts for allocation bar:**
-   Use `BarChart` in horizontal layout, or a simple custom CSS flex bar.
-   The CSS flex bar is actually cleaner and more controllable:
-   ```tsx
-   <div className="flex h-4 rounded overflow-hidden">
-     <div style={{ width: `${cmethPct}%`, background: '#3B82F6' }} />
-     <div style={{ width: `${aavePct}%`, background: '#10B981' }} />
-     <div style={{ width: `${usdyPct}%`, background: '#F59E0B' }} />
-     <div style={{ width: `${idlePct}%`, background: '#374151' }} />
-   </div>
-   ```
-
-4. **Tabular numbers globally:**
-   ```css
-   /* globals.css */
-   [class*="text-"] { font-feature-settings: "tnum" 1; }
-   ```
-   Or add `tabular-nums` Tailwind class to every `<span>` displaying a number.
-
-5. **Skeleton states for IPFS fetches:**
-   Decision log cards should render immediately with skeleton blocks in the
-   reasoning text area while the IPFS fetch completes. Never show a blank card.
+- Never use `bg-accent` (#93C5FD) as a background fill on nav items, tabs, or buttons
+- Never use gradient text (`background-clip: text`)
+- Never use `border-left` thick colored accent stripes
+- Never render identical-size card grids — vary spans by content importance
+- Dashboard pages: no ambient animation layers (landing only)
+- JetBrains Mono for labels/data keys/addresses; Inter for all prose, headings, and interactive labels
